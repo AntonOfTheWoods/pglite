@@ -423,9 +423,10 @@ services:
       - ./volumes/db/data.sql:/docker-entrypoint-initdb.d/migrations/99-seed.sql:Z
 
       # linearlite specific
-      # - ./volumes/db/tables.sql:/docker-entrypoint-initdb.d/migrations/99-tables.sql:Z
-      - ../db/migrations/01-create_tables.sql:/docker-entrypoint-initdb.d/migrations/99-tables.sql:Z
-      - ../db/migrations/02-add_fks.sql:/docker-entrypoint-initdb.d/migrations/99-z_fks.sql:Z
+      - ../volumes/db/extensions.sql:/docker-entrypoint-initdb.d/migrations/99-z0-extensions.sql:Z
+      - ../volumes/db/applyChanges.plv8.sql:/docker-entrypoint-initdb.d/migrations/99-z1-sync.sql:Z
+      - ../db/migrations/01-create_tables.sql:/docker-entrypoint-initdb.d/migrations/99-z2-tables.sql:Z
+      - ../db/migrations-server/02-add_fks.sql:/docker-entrypoint-initdb.d/migrations/99-z3-fks.sql:Z
 
       # Use named volume to persist pgsodium decryption key between restarts
       - db-config:/etc/postgresql-custom
