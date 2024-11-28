@@ -56,7 +56,7 @@ export function generateIssues(numIssues) {
 function generateIssue(kanbanKey, users) {
   const issueId = uuidv4();
   const createdAt = faker.date.past();
-  const user = (faker.number.int(2) === 0
+  const user_id = (faker.number.int(2) === 0
     ? users.find((x) => x.email === JANE_DOE.email).id
     : faker.helpers.arrayElement(users).id).toString();
 
@@ -78,7 +78,7 @@ function generateIssue(kanbanKey, users) {
       .toISOString(),
     kanbanorder: kanbanKey,
     // username: faker.internet.userName(),
-    user_id: user.id,
+    user_id,
     comments: faker.helpers.multiple(
       () => generateComment(issueId, createdAt, users),
       { count: faker.number.int({ min: 0, max: 10 }) }
@@ -88,7 +88,7 @@ function generateIssue(kanbanKey, users) {
 
 function generateComment(issueId, issueCreatedAt, users) {
   const createdAt = faker.date.between({ from: issueCreatedAt, to: new Date() });
-  const user = (faker.number.int(2) === 0
+  const user_id = (faker.number.int(2) === 0
     ? users.find((x) => x.email === JANE_DOE.email).id
     : faker.helpers.arrayElement(users).id).toString();
 
@@ -96,7 +96,7 @@ function generateComment(issueId, issueCreatedAt, users) {
     id: uuidv4(),
     body: faker.lorem.text(),
     // username: faker.internet.userName(),
-    user_id: user.id,
+    user_id,
     issue_id: issueId,
     created: createdAt.toISOString(),
     modified: createdAt.toISOString(), // comments are never modified

@@ -10,6 +10,18 @@ const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
   process.env.VITE_SUPABASE_SERVICE_KEY
 );
+let usersToDelete = await supabase.auth.admin.listUsers();
+const deleteUsers = await Promise.all(
+  usersToDelete.data?.users.map((user) =>
+    supabase.auth.admin.deleteUser(user.id, false)
+  )
+);
+for (const result of deleteUsers) {
+  if (result.error) {
+    throw result.error;
+  }
+}
+
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const ISSUES_TO_LOAD = process.env.ISSUES_TO_LOAD || 512;
