@@ -1,25 +1,30 @@
+import { PGliteProvider } from '@electric-sql/pglite-react'
+import { live, LiveNamespace, LiveQuery } from '@electric-sql/pglite/live'
+import { PGliteWorker } from '@electric-sql/pglite/worker'
+import { Auth } from '@supabase/auth-ui-react'
+import { ThemeSupa } from '@supabase/auth-ui-shared'
 import 'animate.css/animate.min.css'
-import Board from './pages/Board'
-import { useState, createContext, useEffect, useMemo } from 'react'
+import { createContext, useEffect, useMemo, useState } from 'react'
 import {
   createBrowserRouter,
   RouterProvider,
   type Params,
 } from 'react-router-dom'
 import 'react-toastify/dist/ReactToastify.css'
-import { live, LiveNamespace, LiveQuery } from '@electric-sql/pglite/live'
-import { PGliteWorker } from '@electric-sql/pglite/worker'
-import { PGliteProvider } from '@electric-sql/pglite-react'
-import PGWorker from './pglite-worker.js?worker'
+
+import { Session } from '@supabase/supabase-js'
+import Board from './pages/Board'
+import Issue from './pages/Issue'
 import List from './pages/List'
 import Root from './pages/root'
-import Issue from './pages/Issue'
-import {
-  getFilterStateFromSearchParams,
-  filterStateToSql,
-  FilterState,
-} from './utils/filterState'
+import PGWorker from './pglite-worker.js?worker'
+import { supabase } from './supabase'
 import { Issue as IssueType, Status, StatusValue } from './types/types'
+import {
+  FilterState,
+  filterStateToSql,
+  getFilterStateFromSearchParams,
+} from './utils/filterState'
 
 interface MenuContextInterface {
   showMenu: boolean
@@ -141,20 +146,40 @@ const App = () => {
     pgPromise.then(setPgForProvider)
   }, [])
 
+  const [session, setSession] = useState<Session | null>(null)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
   const menuContextValue = useMemo(
     () => ({ showMenu, setShowMenu }),
     [showMenu]
   )
 
-  if (!pgForProvider) return <div>Loading...</div>
-
-  return (
-    <PGliteProvider db={pgForProvider}>
-      <MenuContext.Provider value={menuContextValue}>
-        <RouterProvider router={router} />
-      </MenuContext.Provider>
-    </PGliteProvider>
-  )
+  if (!session) {
+    return <Auth supabaseClient={supabase} appearance={{ theme: ThemeSupa }} />
+  } else if (!pgForProvider) {
+    return
+  } else {
+    return (
+      <PGliteProvider db={pgForProvider}>
+        <MenuContext.Provider value={menuContextValue}>
+          <RouterProvider router={router} />
+        </MenuContext.Provider>
+      </PGliteProvider>
+    )
+  }
 }
 
 export default App

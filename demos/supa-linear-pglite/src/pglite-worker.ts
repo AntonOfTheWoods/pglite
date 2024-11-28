@@ -4,10 +4,12 @@ import { live, type PGliteWithLive } from '@electric-sql/pglite/live'
 import { electricSync } from '@electric-sql/pglite-sync'
 import { migrate } from './migrations'
 import type { IssueChange, CommentChange, ChangeSet } from './utils/changes'
+import { supabase } from './supabase'
 
-const WRITE_SERVER_URL = import.meta.env.VITE_WRITE_SERVER_URL
 const ELECTRIC_URL = import.meta.env.VITE_ELECTRIC_URL
-const APPLY_CHANGES_URL = `${WRITE_SERVER_URL}/apply-changes`
+// const WRITE_SERVER_URL = import.meta.env.VITE_WRITE_SERVER_URL
+// const APPLY_CHANGES_URL = `${WRITE_SERVER_URL}/apply-changes`
+const syncTables = ['issue', 'comment']
 
 worker({
   async init() {
@@ -20,25 +22,18 @@ worker({
         live,
       },
     })
-    await migrate(pg, ['issue', 'comment'])
-    await pg.sync.syncShapeToTable({
-      shape: {
-        url: `${ELECTRIC_URL}/v1/shape`,
-        table: 'issue',
-      },
-      table: 'issue',
-      primaryKey: ['id'],
-      shapeKey: 'issues',
-    })
-    await pg.sync.syncShapeToTable({
-      shape: {
-        url: `${ELECTRIC_URL}/v1/shape`,
-        table: 'comment',
-      },
-      table: 'comment',
-      primaryKey: ['id'],
-      shapeKey: 'comments',
-    })
+    await migrate(pg, syncTables)
+    for (const syncTable of syncTables) {
+      await pg.sync.syncShapeToTable({
+        shape: {
+          url: `${ELECTRIC_URL}/v1/shape`,
+          table: syncTable,
+        },
+        table: syncTable,
+        primaryKey: ['id'],
+        shapeKey: `${syncTable}s`,
+      })
+    }
     startWritePath(pg)
     return pg
   },
@@ -115,14 +110,20 @@ async function doSyncToServer(pg: PGliteWithLive) {
     issues: issueChanges!,
     comments: commentChanges!,
   }
-  const response = await fetch(APPLY_CHANGES_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+  // supabase.functions.setAuth
+  const response = await supabase.functions.invoke('applyChanges', {
     body: JSON.stringify(changeSet),
   })
-  if (!response.ok) {
+
+  // const response = await fetch(APPLY_CHANGES_URL, {
+  //   method: 'POST',
+  //   headers: {
+  //     'Content-Type': 'application/json',
+  //   },
+  //   body: JSON.stringify(changeSet),
+  // })
+  if (response.error) {
+    console.error(response.error)
     throw new Error('Failed to apply changes')
   }
   await pg.transaction(async (tx) => {
