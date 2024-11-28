@@ -1,16 +1,22 @@
-import createPool, { sql } from '@databases/pg'
-import { generateIssues } from './generate_data.js'
+import { createClient } from "@supabase/supabase-js";
+import createPool, { sql } from '@databases/pg';
+import { generateIssues } from './generate_data.js';
 
 if (!process.env.DATABASE_URL) {
-  throw new Error(`DATABASE_URL is not set`)
+  throw new Error(`DATABASE_URL is not set`);
 }
 
-const DATABASE_URL = process.env.DATABASE_URL
-const ISSUES_TO_LOAD = process.env.ISSUES_TO_LOAD || 512
-const issues = generateIssues(ISSUES_TO_LOAD)
+const supabase = createClient(
+  process.env.VITE_SUPABASE_URL,
+  process.env.VITE_SUPABASE_SERVICE_KEY
+);
 
-console.info(`Connecting to Postgres at ${DATABASE_URL}`)
-const db = createPool(DATABASE_URL)
+const DATABASE_URL = process.env.DATABASE_URL;
+const ISSUES_TO_LOAD = process.env.ISSUES_TO_LOAD || 512;
+const [issues, users] = generateIssues(ISSUES_TO_LOAD);
+
+console.info(`Connecting to Postgres at ${DATABASE_URL}`);
+const db = createPool(DATABASE_URL);
 
 function createBatchInsertQuery(table, columns, dataArray) {
   const valuesSql = dataArray.map(
@@ -19,57 +25,73 @@ function createBatchInsertQuery(table, columns, dataArray) {
         columns.map((column) => sql.value(data[column])),
         sql`, `
       )})`
-  )
+  );
 
   return sql`
     INSERT INTO ${sql.ident(table)} (${sql.join(
-      columns.map((col) => sql.ident(col)),
-      sql`, `
-    )})
+    columns.map((col) => sql.ident(col)),
+    sql`, `
+  )})
     VALUES ${sql.join(valuesSql, sql`, `)}
-  `
+  `;
 }
 
-const issueCount = issues.length
-let commentCount = 0
+const issueCount = issues.length;
+let commentCount = 0;
+const sUsers = await supabase.auth.admin.listUsers();
+for (const user of users) {
+  if (!sUsers.data?.users.find((sUser) => sUser.email === user.email)) {
+    const { error } = await supabase.auth.admin.createUser({
+      id: user.id,
+      email: user.email,
+      password: "a_good_password",
+      email_confirm: true,
+      app_metadata: { roles: [user.role] }
+    });
+
+    if (error) {
+      throw error;
+    }
+  }
+}
 
 await db.tx(async (db) => {
-  await db.query(sql`SET CONSTRAINTS ALL DEFERRED;`) // disable FK checks
+  await db.query(sql`SET CONSTRAINTS ALL DEFERRED;`); // disable FK checks
 
-  const batchSize = 1000
+  const batchSize = 1000;
   for (let i = 0; i < issueCount; i += batchSize) {
     const issueBatch = issues
       .slice(i, i + batchSize)
-      .map(({ comments: _, ...rest }) => rest)
+      .map(({ comments: _, ...rest }) => rest);
     await db.query(
       createBatchInsertQuery('issue', Object.keys(issueBatch[0]), issueBatch)
-    )
+    );
 
     process.stdout.write(
       `Loaded ${Math.min(i + batchSize, issueCount)} of ${issueCount} issues\r`
-    )
+    );
   }
 
-  const allComments = issues.flatMap((issue) => issue.comments)
-  commentCount = allComments.length
+  const allComments = issues.flatMap((issue) => issue.comments);
+  commentCount = allComments.length;
 
   for (let i = 0; i < allComments.length; i += batchSize) {
-    const commentBatch = allComments.slice(i, i + batchSize)
+    const commentBatch = allComments.slice(i, i + batchSize);
     await db.query(
       createBatchInsertQuery(
         'comment',
         Object.keys(commentBatch[0]),
         commentBatch
       )
-    )
+    );
 
     process.stdout.write(
       `Loaded ${Math.min(i + batchSize, commentCount)} of ${commentCount} comments\r`
-    )
+    );
   }
-})
+});
 
-process.stdout.write(`\n`)
+process.stdout.write(`\n`);
 
-db.dispose()
-console.info(`Loaded ${issueCount} issues with ${commentCount} comments.`)
+db.dispose();
+console.info(`Loaded ${issueCount} issues with ${commentCount} comments.`);

@@ -48,9 +48,9 @@ export function generateIssues(numIssues) {
   const kanbanKeys = faker.helpers.shuffle(
     generateNKeysBetween(null, null, numIssues)
   );
-  return Array.from({ length: numIssues }, (_, idx) =>
+  return [Array.from({ length: numIssues }, (_, idx) =>
     generateIssue(kanbanKeys[idx], users)
-  );
+  ), users];
 }
 
 function generateIssue(kanbanKey, users) {

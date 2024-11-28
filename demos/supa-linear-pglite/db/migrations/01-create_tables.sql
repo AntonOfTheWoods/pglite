@@ -19,5 +19,5 @@ CREATE TABLE IF NOT EXISTS "comment" (
     "issue_id" UUID NOT NULL,
     "modified" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     "created" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT "comment_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "comment_pkey" PRIMARY KEY ("id")
 );
