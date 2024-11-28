@@ -23,16 +23,16 @@ function IssueRow({ issue, style }: Props) {
 
   const handleChangeStatus = (status: string) => {
     pg.sql`
-      UPDATE issue 
-      SET status = ${status}, modified = ${new Date()} 
+      UPDATE issue
+      SET status = ${status}, modified = ${new Date()}
       WHERE id = ${issue!.id}
     `
   }
 
   const handleChangePriority = (priority: string) => {
     pg.sql`
-      UPDATE issue 
-      SET priority = ${priority}, modified = ${new Date()} 
+      UPDATE issue
+      SET priority = ${priority}, modified = ${new Date()}
       WHERE id = ${issue!.id}
     `
   }
@@ -77,7 +77,7 @@ function IssueRow({ issue, style }: Props) {
         {formatDate(issue.created)}
       </div>
       <div className="flex-shrink-0 hidden ml-4 font-normal text-gray-500 sm:block w-15 md:block">
-        <Avatar name={issue.username} />
+        <Avatar name={issue.user_id} />
       </div>
       <div className="flex-shrink-0 hidden ml-4 font-normal text-gray-500 sm:block w-15 md:block">
         {issue.synced ? (

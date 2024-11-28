@@ -29,9 +29,9 @@ function Comments({ issue }: CommentsProps) {
           className="flex flex-col w-full p-3 mb-3 bg-white rounded shadow-sm border"
         >
           <div className="flex items-center mb-2">
-            <Avatar name={comment.username} />
+            <Avatar name={comment.user_id} />
             <span className="ms-2 text-sm text-gray-400">
-              {comment.username}
+              {comment.user_id}
             </span>
             <span className=" ms-auto text-sm text-gray-400 ml-2">
               {formatDate(comment.created)}
@@ -63,7 +63,7 @@ function Comments({ issue }: CommentsProps) {
     }
 
     pg.sql`
-      INSERT INTO comment (id, issue_id, body, created, username)
+      INSERT INTO comment (id, issue_id, body, created, user_id)
       VALUES (
         ${crypto.randomUUID()},
         ${issue.id},

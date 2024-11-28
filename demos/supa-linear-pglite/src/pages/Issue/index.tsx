@@ -38,8 +38,8 @@ function IssuePage() {
     debounce(async (title: string) => {
       console.log(`handleTitleChangeDebounced`, title)
       pg.sql`
-      UPDATE issue 
-      SET title = ${title}, modified = ${new Date()} 
+      UPDATE issue
+      SET title = ${title}, modified = ${new Date()}
       WHERE id = ${issue.id}
     `
       // We can't set titleIsDirty.current = false here because we haven't yet received
@@ -52,8 +52,8 @@ function IssuePage() {
   const handleDescriptionChangeDebounced = useCallback(
     debounce(async (description: string) => {
       pg.sql`
-        UPDATE issue 
-        SET description = ${description}, modified = ${new Date()} 
+        UPDATE issue
+        SET description = ${description}, modified = ${new Date()}
         WHERE id = ${issue.id}
       `
       // We can't set descriptionIsDirty.current = false here because we haven't yet received
@@ -81,16 +81,16 @@ function IssuePage() {
 
   const handleStatusChange = (status: string) => {
     pg.sql`
-      UPDATE issue 
-      SET status = ${status}, modified = ${new Date()} 
+      UPDATE issue
+      SET status = ${status}, modified = ${new Date()}
       WHERE id = ${issue.id}
     `
   }
 
   const handlePriorityChange = (priority: string) => {
     pg.sql`
-      UPDATE issue 
-      SET priority = ${priority}, modified = ${new Date()} 
+      UPDATE issue
+      SET priority = ${priority}, modified = ${new Date()}
       WHERE id = ${issue.id}
     `
   }
@@ -181,8 +181,8 @@ function IssuePage() {
                     type="button"
                     className="inline-flex items-center h-6 ps-1.5 pe-2 text-gray-500border-none rounded hover:bg-gray-100"
                   >
-                    <Avatar name={issue.username} />
-                    <span className="ml-1">{issue.username}</span>
+                    <Avatar name={issue.user_id} />
+                    <span className="ml-1">{issue.user_id}</span>
                   </button>
                 </div>
               </div>

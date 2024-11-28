@@ -3832,7 +3832,7 @@ var syncChangeSchema = z.object({
 var commonChangeSchema = syncChangeSchema.merge(z.object({
   modified: z.string().nullable().optional(),
   created: z.string().nullable().optional(),
-  username: z.string().nullable().optional()
+  user_id: z.string().nullable().optional()
 }));
 var issueChangeSchema = commonChangeSchema.merge(z.object({
   title: z.string().nullable().optional(),

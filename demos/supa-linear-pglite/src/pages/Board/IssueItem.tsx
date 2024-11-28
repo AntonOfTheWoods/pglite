@@ -42,8 +42,8 @@ const IssueItem = ({ issue, style, isDragging, provided }: IssueProps) => {
 
   const updatePriority = (priority: string) => {
     pg.sql`
-      UPDATE issue 
-      SET priority = ${priority}, modified = ${new Date()} 
+      UPDATE issue
+      SET priority = ${priority}, modified = ${new Date()}
       WHERE id = ${issue.id}
     `
   }
@@ -69,7 +69,7 @@ const IssueItem = ({ issue, style, isDragging, provided }: IssueProps) => {
           </span>
         </div>
         <div className="flex-shrink-0">
-          <Avatar name={issue.username} />
+          <Avatar name={issue.user_id} />
         </div>
       </div>
       <div className="mt-2.5 flex items-center">
