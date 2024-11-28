@@ -97,8 +97,8 @@ worker({
     })
     await migrate(pg, syncTables)
 
-    if (!syncSetup && currentToken) {
-      console.log('setting up db with', currentToken)
+    if (!syncSetup && (await currentToken)) {
+      console.log('setting up db with', await currentToken)
       await setupDbSync(pg)
       syncSetup = true
     } else {
