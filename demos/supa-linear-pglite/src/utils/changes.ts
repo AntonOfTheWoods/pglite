@@ -11,7 +11,7 @@ const commonChangeSchema = syncChangeSchema.merge(
   z.object({
     modified: z.string().nullable().optional(),
     created: z.string().nullable().optional(),
-    username: z.string().nullable().optional(),
+    user_id: z.string().nullable().optional(),
   })
 )
 

@@ -21,14 +21,14 @@ export type Issue = {
   modified: Date
   created: Date
   kanbanorder: string
-  username: string
+  user_id: string
   synced: boolean
 }
 
 export type Comment = {
   id: string
   body: string
-  username: string
+  user_id: string
   issue_id: string
   created: Date
   synced: boolean

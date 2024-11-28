@@ -23,7 +23,66 @@ async function getToken() {
   return data.session?.access_token
 }
 
-const currentToken = await getToken()
+let currentToken = getToken()
+let syncSetup = false
+
+async function setupDbSync(pg: PGliteWithLive) {
+  for (const syncTable of syncTables) {
+    await pg.sync.syncShapeToTable({
+      shape: {
+        url: `${ELECTRIC_URL}`,
+        table: syncTable,
+        headers: {
+          authorization: `Bearer ${await currentToken}`,
+        },
+        // Add custom URL parameters
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onError: async (error: any) => {
+          console.log('i go me an error', error)
+          if (
+            error instanceof FetchError &&
+            [401, 403].includes(error.status)
+          ) {
+            // const token = await getToken();
+            const token = (await supabase.auth.refreshSession()).data.session
+              ?.access_token
+            return {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          }
+          // Rethrow errors we can't handle
+          throw error
+        },
+      },
+      table: syncTable,
+      primaryKey: ['id'],
+      shapeKey: `${syncTable}s`,
+    })
+  }
+  startWritePath(pg)
+}
+async function initCheck(db: PGliteWithLive) {
+  const ses = await supabase.auth.getSession()
+  if (!ses.data.session?.user) {
+    console.log('no session found, waiting and trying again', ses)
+    setTimeout(async () => {
+      await initCheck(db)
+    }, 2000)
+  } else {
+    currentToken = Promise.resolve(ses.data.session.access_token)
+    console.log(
+      'found a session, i have syncstup and currenttokent',
+      syncSetup,
+      ses.data.session
+    )
+    if (!syncSetup && (await currentToken)) {
+      await setupDbSync(db)
+      syncSetup = true
+    }
+  }
+}
 
 worker({
   async init() {
@@ -37,40 +96,15 @@ worker({
       },
     })
     await migrate(pg, syncTables)
-    for (const syncTable of syncTables) {
-      await pg.sync.syncShapeToTable({
-        shape: {
-          url: `${ELECTRIC_URL}`,
-          table: syncTable,
-          headers: {
-            authorization: `Bearer ${currentToken}`,
-          },
-          // Add custom URL parameters
-          onError: async (error) => {
-            console.log('i go me an error', error)
-            if (
-              error instanceof FetchError &&
-              [401, 403].includes(error.status)
-            ) {
-              // const token = await getToken();
-              const token = (await supabase.auth.refreshSession()).data.session
-                ?.access_token
-              return {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-              }
-            }
-            // Rethrow errors we can't handle
-            throw error
-          },
-        },
-        table: syncTable,
-        primaryKey: ['id'],
-        shapeKey: `${syncTable}s`,
-      })
+
+    if (!syncSetup && currentToken) {
+      console.log('setting up db with', currentToken)
+      await setupDbSync(pg)
+      syncSetup = true
+    } else {
+      initCheck(pg)
     }
-    startWritePath(pg)
+
     return pg
   },
 })
@@ -118,7 +152,7 @@ async function doSyncToServer(pg: PGliteWithLive) {
         modified,
         created,
         kanbanorder,
-        username,
+        user_id,
         modified_columns,
         deleted,
         new
@@ -129,7 +163,7 @@ async function doSyncToServer(pg: PGliteWithLive) {
       SELECT
         id,
         body,
-        username,
+        user_id,
         issue_id,
         modified,
         created,

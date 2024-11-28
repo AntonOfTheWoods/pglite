@@ -98,7 +98,7 @@ export function filterStateToSql(filterState: FilterState) {
     sqlParams.push(filterState.query)
   }
   const sql = `
-    SELECT id, title, priority, status, modified, created, kanbanorder, username, synced
+    SELECT id, title, priority, status, modified, created, kanbanorder, user_id, synced
     FROM issue
     WHERE
       ${sqlWhere.length ? `${sqlWhere.join(' AND ')} AND ` : ''}

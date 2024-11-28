@@ -83,10 +83,7 @@ Deno.serve(async (req: Request) => {
   })
   // Only query data the user has access to unless they're an admin.
   if (!user.app_metadata?.roles?.includes('admin')) {
-    originUrl.searchParams.set(
-      `where`,
-      `"username" = '${user.app_metadata.username}'`
-    )
+    originUrl.searchParams.set(`where`, `"user_id" = '${user.id}'`)
   }
   console.log('trying to query', originUrl.toString())
   // When proxying long-polling requests, content-encoding &
