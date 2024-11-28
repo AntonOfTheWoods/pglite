@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS "issue" (
     CONSTRAINT "issue_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE  IF NOT EXISTS "comment" (
+CREATE TABLE IF NOT EXISTS "comment" (
     "id" UUID NOT NULL,
     "body" TEXT NOT NULL,
     "username" TEXT NOT NULL,
@@ -20,5 +20,4 @@ CREATE TABLE  IF NOT EXISTS "comment" (
     "modified" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     "created" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT "comment_pkey" PRIMARY KEY ("id"),
-    FOREIGN KEY (issue_id) REFERENCES issue(id) ON DELETE CASCADE
 );

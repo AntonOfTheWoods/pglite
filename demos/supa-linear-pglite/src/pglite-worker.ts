@@ -20,7 +20,7 @@ worker({
         live,
       },
     })
-    await migrate(pg)
+    await migrate(pg, ['issue', 'comment'])
     await pg.sync.syncShapeToTable({
       shape: {
         url: `${ELECTRIC_URL}/v1/shape`,

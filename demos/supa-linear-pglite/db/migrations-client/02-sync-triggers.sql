@@ -1,58 +1,3 @@
--- # Tables and indexes
-CREATE TABLE IF NOT EXISTS "issue" (
-    "id" UUID NOT NULL,
-    "title" TEXT NOT NULL,
-    "description" TEXT NOT NULL,
-    "priority" TEXT NOT NULL,
-    "status" TEXT NOT NULL,
-    "modified" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    "created" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    "kanbanorder" TEXT NOT NULL,
-    "username" TEXT NOT NULL,
-    "deleted" BOOLEAN NOT NULL DEFAULT FALSE, -- Soft delete for local deletions
-    "new" BOOLEAN NOT NULL DEFAULT FALSE, -- New row flag for local inserts
-    "modified_columns" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[], -- Columns that have been modified locally
-    "sent_to_server" BOOLEAN NOT NULL DEFAULT FALSE, -- Flag to track if the row has been sent to the server
-    "synced" BOOLEAN GENERATED ALWAYS AS (ARRAY_LENGTH(modified_columns, 1) IS NULL AND NOT deleted AND NOT new) STORED,
-    "backup" JSONB, -- JSONB column to store the backup of the row data for modified columns
-    "search_vector" tsvector GENERATED ALWAYS AS (
-        setweight(to_tsvector('simple', coalesce(title, '')), 'A') ||
-        setweight(to_tsvector('simple', coalesce(description, '')), 'B')
-    ) STORED,
-    CONSTRAINT "issue_pkey" PRIMARY KEY ("id")
-);
-
-CREATE TABLE IF NOT EXISTS "comment" (
-    "id" UUID NOT NULL,
-    "body" TEXT NOT NULL,
-    "username" TEXT NOT NULL,
-    "issue_id" UUID NOT NULL,
-    "modified" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    "created" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    "deleted" BOOLEAN NOT NULL DEFAULT FALSE, -- Soft delete for local deletions
-    "new" BOOLEAN NOT NULL DEFAULT FALSE, -- New row flag for local inserts
-    "modified_columns" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[], -- Columns that have been modified locally
-    "sent_to_server" BOOLEAN NOT NULL DEFAULT FALSE, -- Flag to track if the row has been sent to the server
-    "synced" BOOLEAN GENERATED ALWAYS AS (ARRAY_LENGTH(modified_columns, 1) IS NULL AND NOT deleted AND NOT new) STORED,
-    "backup" JSONB, -- JSONB column to store the backup of the row data for modified columns
-    CONSTRAINT "comment_pkey" PRIMARY KEY ("id")
-);
-
-CREATE INDEX IF NOT EXISTS "issue_id_idx" ON "issue" ("id");
-CREATE INDEX IF NOT EXISTS "issue_priority_idx" ON "issue" ("priority");
-CREATE INDEX IF NOT EXISTS "issue_status_idx" ON "issue" ("status");
-CREATE INDEX IF NOT EXISTS "issue_modified_idx" ON "issue" ("modified");
-CREATE INDEX IF NOT EXISTS "issue_created_idx" ON "issue" ("created");
-CREATE INDEX IF NOT EXISTS "issue_kanbanorder_idx" ON "issue" ("kanbanorder");
-CREATE INDEX IF NOT EXISTS "issue_deleted_idx" ON "issue" ("deleted");
-CREATE INDEX IF NOT EXISTS "issue_synced_idx" ON "issue" ("synced");
-CREATE INDEX IF NOT EXISTS "issue_search_idx" ON "issue" USING GIN ("search_vector");
-
-CREATE INDEX IF NOT EXISTS "comment_id_idx" ON "comment" ("id");
-CREATE INDEX IF NOT EXISTS "comment_issue_id_idx" ON "comment" ("issue_id");
-CREATE INDEX IF NOT EXISTS "comment_created_idx" ON "comment" ("created");
-CREATE INDEX IF NOT EXISTS "comment_deleted_idx" ON "comment" ("deleted");
-CREATE INDEX IF NOT EXISTS "comment_synced_idx" ON "comment" ("synced");
 
 -- During sync the electric.syncing config var is set to true
 -- We can use this in triggers to determine the action that should be performed
@@ -92,19 +37,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE TRIGGER issue_delete_trigger
-BEFORE DELETE ON issue
-FOR EACH ROW
-EXECUTE FUNCTION handle_delete();
-
-CREATE OR REPLACE TRIGGER comment_delete_trigger
-BEFORE DELETE ON comment
-FOR EACH ROW
-EXECUTE FUNCTION handle_delete();
-
 -- # Insert triggers:
 -- - During sync we insert rows and set modified_columns = []
--- - Otherwise we insert rows and set modified_columns to contain the names of all 
+-- - Otherwise we insert rows and set modified_columns to contain the names of all
 --   columns that are not local-state related
 
 CREATE OR REPLACE FUNCTION handle_insert()
@@ -135,8 +70,8 @@ BEGIN
         EXECUTE format('SELECT 1 FROM %I WHERE id = $1', TG_TABLE_NAME) USING NEW.id INTO old_value;
         IF old_value IS NOT NULL THEN
             -- Apply update logic similar to handle_update function
-            FOR col_name IN SELECT column_name 
-                               FROM information_schema.columns 
+            FOR col_name IN SELECT column_name
+                               FROM information_schema.columns
                                WHERE table_name = TG_TABLE_NAME AND
                                      column_name NOT IN ('id', 'synced', 'modified_columns', 'backup', 'deleted', 'new', 'sent_to_server', 'search_vector') LOOP
                 EXECUTE format('SELECT $1.%I', col_name) USING NEW INTO new_value;
@@ -159,7 +94,7 @@ BEGIN
     ELSE
         -- For local inserts, we add all non-local-state columns to modified_columns
         SELECT array_agg(column_name) INTO modified_columns
-        FROM information_schema.columns 
+        FROM information_schema.columns
         WHERE table_name = TG_TABLE_NAME
         AND column_name NOT IN ('id', 'synced', 'modified_columns', 'backup', 'deleted', 'new', 'sent_to_server', 'search_vector');
         NEW.modified_columns := modified_columns;
@@ -170,16 +105,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE TRIGGER issue_insert_trigger
-BEFORE INSERT ON issue
-FOR EACH ROW
-EXECUTE FUNCTION handle_insert();
-
-CREATE OR REPLACE TRIGGER comment_insert_trigger
-BEFORE INSERT ON comment
-FOR EACH ROW
-EXECUTE FUNCTION handle_insert();
-
 -- # Update triggers:
 -- - During sync:
 --   - If the new modified timestamp is >= the one in the database, we apply the update,
@@ -187,8 +112,8 @@ EXECUTE FUNCTION handle_insert();
 --   - Otherwise we apply the update to columns that are NOT in modified_columns and
 --   - and save the values for the non-updated columns in the backup JSONB column
 -- - During a non-sync transaction:
---   - If we write over a column (that are not local-state related) that was not 
---     already modified, we add that column name to modified_columns, and copy the 
+--   - If we write over a column (that are not local-state related) that was not
+--     already modified, we add that column name to modified_columns, and copy the
 --     current value from the column to the backup JSONB column
 --   - Otherwise we just update the column
 
@@ -220,9 +145,9 @@ BEGIN
             NEW.sent_to_server := FALSE;
         ELSE
             -- Apply update only to columns not in modified_columns
-            FOR column_name IN SELECT columns.column_name 
-                               FROM information_schema.columns 
-                               WHERE columns.table_name = TG_TABLE_NAME 
+            FOR column_name IN SELECT columns.column_name
+                               FROM information_schema.columns
+                               WHERE columns.table_name = TG_TABLE_NAME
                                AND columns.column_name NOT IN ('id', 'synced', 'modified_columns', 'backup', 'deleted', 'new', 'sent_to_server', 'search_vector') LOOP
                 IF column_name != ANY(OLD.modified_columns) THEN
                     EXECUTE format('SELECT ($1).%I', column_name) USING NEW INTO new_value;
@@ -237,9 +162,9 @@ BEGIN
         END IF;
     ELSE
         -- During non-sync transaction
-        FOR column_name IN SELECT columns.column_name 
-                           FROM information_schema.columns 
-                           WHERE columns.table_name = TG_TABLE_NAME 
+        FOR column_name IN SELECT columns.column_name
+                           FROM information_schema.columns
+                           WHERE columns.table_name = TG_TABLE_NAME
                            AND columns.column_name NOT IN ('id', 'synced', 'modified_columns', 'backup', 'deleted', 'new', 'sent_to_server', 'search_vector') LOOP
             EXECUTE format('SELECT ($1).%I', column_name) USING NEW INTO new_value;
             EXECUTE format('SELECT ($1).%I', column_name) USING OLD INTO old_value;
@@ -256,16 +181,6 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE TRIGGER issue_update_trigger
-BEFORE UPDATE ON issue
-FOR EACH ROW
-EXECUTE FUNCTION handle_update();
-
-CREATE OR REPLACE TRIGGER comment_update_trigger
-BEFORE UPDATE ON comment
-FOR EACH ROW
-EXECUTE FUNCTION handle_update();
 
 -- # Functions to revert local changes using the backup column
 
