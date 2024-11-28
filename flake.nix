@@ -20,7 +20,7 @@
     extra-substituters = "https://devenv.cachix.org";
   };
 
-  outputs = { self, nixpkgs, devenv, systems, nixpkgs-denov1, ... } @ inputs:
+  outputs = { self, nixpkgs, devenv, systems, ... } @ inputs:
     let
       forEachSystem = nixpkgs.lib.genAttrs (import systems);
     in
@@ -40,6 +40,19 @@
               inherit inputs pkgs;
               modules = [
                 {
+                  packages = [ pkgs.glibc ];  # required for bun
+                  languages.javascript = {
+                    package = pkgs.nodejs-slim_22;
+                    enable = true;
+                    bun = {
+                      enable = true;
+                    };
+                    pnpm = {
+                      enable = true;
+                      # install.enable = true;
+                    };
+                  };
+                  languages.typescript.enable = true;
                   languages.python = {
                     version = "3.12.7";
                     enable = true;
