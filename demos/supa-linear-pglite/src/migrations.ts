@@ -1,6 +1,6 @@
 import type { PGlite } from '@electric-sql/pglite'
-import m2 from '../db/migrations-client/02-sync-triggers?raw'
-import m3 from '../db/migrations-client/03-add-local-only-columns?raw'
+import m2 from '../db/migrations-client/02-sync-triggers.sql?raw'
+import m3 from '../db/migrations-client/03-add-local-only-columns.sql?raw'
 import m1 from '../db/migrations/01-create_tables.sql?raw'
 
 async function addSync(pg: PGlite, tables: string[]) {

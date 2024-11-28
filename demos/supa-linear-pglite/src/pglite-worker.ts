@@ -5,11 +5,25 @@ import { electricSync } from '@electric-sql/pglite-sync'
 import { migrate } from './migrations'
 import type { IssueChange, CommentChange, ChangeSet } from './utils/changes'
 import { supabase } from './supabase'
+import { FetchError } from '@electric-sql/client'
 
 const ELECTRIC_URL = import.meta.env.VITE_ELECTRIC_URL
-// const WRITE_SERVER_URL = import.meta.env.VITE_WRITE_SERVER_URL
-// const APPLY_CHANGES_URL = `${WRITE_SERVER_URL}/apply-changes`
 const syncTables = ['issue', 'comment']
+
+async function getToken() {
+  // const { data: user } = await supabase.auth.getUser();
+  // if (!user.user?.id) {
+  //   await supabase.auth.reauthenticate();
+  // }
+  const { data, error } = await supabase.auth.getSession()
+  if (error) {
+    console.log('i got a supa error', error)
+  }
+
+  return data.session?.access_token
+}
+
+const currentToken = await getToken()
 
 worker({
   async init() {
@@ -26,8 +40,30 @@ worker({
     for (const syncTable of syncTables) {
       await pg.sync.syncShapeToTable({
         shape: {
-          url: `${ELECTRIC_URL}/v1/shape`,
+          url: `${ELECTRIC_URL}`,
           table: syncTable,
+          headers: {
+            authorization: `Bearer ${currentToken}`,
+          },
+          // Add custom URL parameters
+          onError: async (error) => {
+            console.log('i go me an error', error)
+            if (
+              error instanceof FetchError &&
+              [401, 403].includes(error.status)
+            ) {
+              // const token = await getToken();
+              const token = (await supabase.auth.refreshSession()).data.session
+                ?.access_token
+              return {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              }
+            }
+            // Rethrow errors we can't handle
+            throw error
+          },
         },
         table: syncTable,
         primaryKey: ['id'],

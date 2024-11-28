@@ -261,6 +261,9 @@ importers:
 
   demos/supa-linear-pglite:
     dependencies:
+      '@electric-sql/client':
+        specifier: ~0.8.0
+        version: 0.8.0
       '@electric-sql/pglite':
         specifier: workspace:*
         version: link:../../packages/pglite

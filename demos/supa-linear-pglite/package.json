@@ -19,6 +19,7 @@
     "stylecheck": "eslint ./src && prettier --check ./src ./db"
   },
   "dependencies": {
+    "@electric-sql/client": "~0.8.0",
     "@electric-sql/pglite": "workspace:*",
     "@electric-sql/pglite-react": "workspace:*",
     "@electric-sql/pglite-repl": "workspace:*",
