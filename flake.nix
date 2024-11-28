@@ -4,15 +4,7 @@
     systems.url = "github:nix-systems/default";
     devenv.url = "github:cachix/devenv";
     devenv.inputs.nixpkgs.follows = "nixpkgs";
-    nixpkgs-python.url = "github:cachix/nixpkgs-python";
-    nixpkgs-python.inputs = { nixpkgs.follows = "nixpkgs"; };
-
-    # what are these for?
-    # flake-utils = {
-    #   url = "github:numtide/flake-utils";
-    #   inputs.systems.follows = "systems";
-    # };
-
+    nixpkgs-denov1.url = "github:nixos/nixpkgs/dfb72de3dbe62ff47e59894d50934e03f0602072";
   };
 
   nixConfig = {
@@ -20,7 +12,7 @@
     extra-substituters = "https://devenv.cachix.org";
   };
 
-  outputs = { self, nixpkgs, devenv, systems, ... } @ inputs:
+  outputs = { self, nixpkgs, devenv, systems, nixpkgs-denov1, ... } @ inputs:
     let
       forEachSystem = nixpkgs.lib.genAttrs (import systems);
     in
@@ -53,10 +45,10 @@
                     };
                   };
                   languages.typescript.enable = true;
-                  languages.python = {
-                    version = "3.12.7";
+                  languages.deno = {
+                    package = nixpkgs-denov1.legacyPackages.${system}.deno;
                     enable = true;
-                };
+                  };
                 }
               ];
             };
