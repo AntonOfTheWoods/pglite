@@ -96,7 +96,6 @@
     "@types/node-fetch": "^2.6.11",
     "async-mutex": "^0.4.1",
     "buffer": "^6.0.3",
-    "bun": "^1.1.30",
     "concurrently": "^8.2.2",
     "http-server": "^14.1.1",
     "playwright": "^1.48.0",
