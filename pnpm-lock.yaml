@@ -418,6 +418,9 @@ importers:
       '@types/node':
         specifier: ^20.14.10
         version: 20.16.11
+      '@types/plv8-internal':
+        specifier: ^3.1.2
+        version: 3.1.2
       '@types/react':
         specifier: ^18.3.3
         version: 18.3.11
@@ -2233,6 +2236,9 @@ packages:
 
   '@types/phoenix@1.6.6':
     resolution: {integrity: sha512-PIzZZlEppgrpoT2QgbnDU+MMzuR6BbCjllj0bM70lWoejMeNJAxCchxnv7J3XFkI8MpygtRpzXrIlmWUBclP5A==}
+
+  '@types/plv8-internal@3.1.2':
+    resolution: {integrity: sha512-ijKV2SS6MZzbPX+p5ZFVGd0f5BCbj4v7yGq2vfh6r9Lw6/V8HrS6QRU0qSW+spo3aBj85jfoU4wv4wkW+QZViQ==}
 
   '@types/prop-types@15.7.13':
     resolution: {integrity: sha512-hCZTSvwbzWGvhqxp/RqVqwU999pBf2vp7hzIjiYOsl8wqOmUxkQ6ddw1cV3l8811+kdUFus/q4d1Y3E3SyEifA==}
@@ -8126,6 +8132,8 @@ snapshots:
       pg-types: 4.0.2
 
   '@types/phoenix@1.6.6': {}
+
+  '@types/plv8-internal@3.1.2': {}
 
   '@types/prop-types@15.7.13': {}
 

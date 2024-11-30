@@ -1,5 +1,40 @@
 DROP FUNCTION IF EXISTS applyChanges(content JSONB);
 CREATE OR REPLACE FUNCTION applyChanges(content JSONB) RETURNS JSONB AS $plv8ify$
+// src/plugins/pglite-writesync/server.ts
+async function serverApplyChanges(changes, transaction2, executeName) {
+  plv8.elog(NOTICE, JSON.stringify(changes), executeName);
+  await transaction2((executor) => {
+    for (const [table, tableChanges] of Object.entries(changes)) {
+      for (const change of tableChanges) {
+        applyTableChange(table, change, executor[executeName]);
+      }
+    }
+  });
+  return { success: true };
+}
+async function applyTableChange(tableName, change, execute) {
+  const { id, modified_columns, new: isNew, deleted } = change;
+  if (deleted) {
+    await execute(`
+        DELETE FROM ${tableName} WHERE id = $1
+      `, [id]);
+  } else if (isNew) {
+    const columns = modified_columns || [];
+    const values = columns.map((col) => change[col]);
+    await execute(`
+        INSERT INTO ${tableName} (id, ${columns.join(", ")})
+        VALUES ($1, ${columns.map((_, index) => `$${index + 2}`).join(", ")})
+      `, [id, ...values]);
+  } else {
+    const columns = modified_columns || [];
+    const values = columns.map((col) => change[col]);
+    const updateSet = columns.map((col, index) => `${col} = $${index + 2}`).join(", ");
+    await execute(`
+        UPDATE ${tableName} SET ${updateSet} WHERE id = $1
+      `, [id, ...values]);
+  }
+}
+
 // ../../node_modules/.pnpm/zod@3.23.8/node_modules/zod/lib/index.mjs
 var util;
 (function(util2) {
@@ -10,7 +45,6 @@ var util;
   function assertNever(_x) {
     throw new Error();
   }
-
   util2.assertNever = assertNever;
   util2.arrayToEnum = (items) => {
     const obj = {};
@@ -3854,42 +3888,15 @@ var READWRITE_SYNC_TABLES = ["issue", "comment"];
 var READ_SYNC_TABLES = ["profiles", ...READWRITE_SYNC_TABLES];
 
 // server/rpc/apply-changes.ts
-function applyChanges(content) {
-  const contentObject = content;
-  const parsedChanges = changeSetSchema.parse(contentObject);
+async function transaction(executor) {
   plv8.subtransaction(() => {
-    for (const [table, changes] of Object.entries(parsedChanges)) {
-      for (const change of changes) {
-        applyTableChange(table, change);
-      }
-    }
+    executor(plv8);
   });
-  return { data: "ok" };
 }
-function applyTableChange(tableName, change) {
-  const { id, modified_columns, new: isNew, deleted } = change;
-  if (deleted) {
-    plv8.execute(`
-        DELETE FROM ${tableName} WHERE id = $1
-        -- ON CONFLICT (id) DO NOTHING
-      `, [id]);
-  } else if (isNew) {
-    const columns = modified_columns || [];
-    const values = columns.map((col) => change[col]);
-    plv8.execute(`
-        INSERT INTO ${tableName} (id, ${columns.join(", ")})
-        VALUES ($1, ${columns.map((_, index) => `$${index + 2}`).join(", ")})
-        -- ON CONFLICT (id) DO NOTHING
-      `, [id, ...values]);
-  } else {
-    const columns = modified_columns || [];
-    const values = columns.map((col) => change[col]);
-    const updateSet = columns.map((col, index) => `${col} = $${index + 2}`).join(", ");
-    plv8.execute(`
-        UPDATE ${tableName} SET ${updateSet} WHERE id = $1
-        -- ON CONFLICT (id) DO NOTHING
-      `, [id, ...values]);
-  }
+function applyChanges(content) {
+  const parsedChanges = changeSetSchema.parse(content);
+  serverApplyChanges(parsedChanges, transaction, "execute");
+  return { data: "ok" };
 }
 
 

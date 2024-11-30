@@ -5,20 +5,13 @@ import {
 import { ChangeSet, changeSetSchema } from '../../src/utils/changes'
 
 async function transaction(executor: TransactionCallback) {
-  plv8.transaction(() => {
+  plv8.subtransaction(() => {
     executor(plv8)
   })
 }
 
 export function applyChanges(content: ChangeSet) {
   const parsedChanges = changeSetSchema.parse(content)
-  // const transaction: TransactionCallback = (
-  //   executor: Record<string, ExecuteCallback>
-  // ) => {
-  //   return plv8.subtransaction(() => {
-  //     return plv8.execute
-  //   })
-  // }
 
   serverApplyChanges(parsedChanges, transaction, 'execute')
   return { data: 'ok' }

@@ -14,6 +14,9 @@ import {
 } from './utils/changes'
 import { DB_NAME, ELECTRIC_URL } from './utils/const'
 
+const WRITE_SERVER_URL = import.meta.env.VITE_WRITE_SERVER_URL
+const APPLY_CHANGES_URL = `${WRITE_SERVER_URL}/apply-changes`
+
 async function getToken() {
   const { data, error } = await supabase.auth.getSession()
   if (error) {
@@ -150,14 +153,28 @@ async function doSyncToServer(pg: PGliteWithLive) {
       }
     )
   }
-  const response = await supabase.rpc('applychanges', {
-    content: changeSet,
-  })
 
-  if (response.error) {
-    console.error(response.error)
-    throw new Error('Failed to apply changes')
+  if (WRITE_SERVER_URL) {
+    const response = await fetch(APPLY_CHANGES_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(changeSet),
+    })
+    if (!response.ok) {
+      throw new Error('Failed to apply changes')
+    }
+  } else {
+    const response = await supabase.rpc('applychanges', {
+      content: changeSet,
+    })
+    if (response.error) {
+      console.error(response.error)
+      throw new Error('Failed to apply changes')
+    }
   }
+
   await pg.transaction(async (tx) => {
     // Mark all changes as sent to server, but check that the modified timestamp
     // has not changed in the meantime
