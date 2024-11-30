@@ -1,15 +1,22 @@
 import { z } from 'zod'
+import {
+  deleted,
+  idColumn,
+  isNew,
+  modified,
+  modifiedColumns,
+} from '../plugins/pglite-writesync/consts'
 
 const syncChangeSchema = z.object({
-  id: z.string(),
-  modified_columns: z.array(z.string()).nullable().optional(),
-  deleted: z.boolean().nullable().optional(),
-  new: z.boolean().nullable().optional(),
+  [idColumn]: z.string(),
+  [modifiedColumns]: z.array(z.string()).nullable().optional(),
+  [deleted]: z.boolean().nullable().optional(),
+  [isNew]: z.boolean().nullable().optional(),
+  [modified]: z.string().nullable().optional(),
 })
 
 const commonChangeSchema = syncChangeSchema.merge(
   z.object({
-    modified: z.string().nullable().optional(),
     created: z.string().nullable().optional(),
     user_id: z.string().nullable().optional(),
   })
@@ -44,20 +51,6 @@ export const changeSetSchema = z.object({
 export type ChangeSet = z.infer<typeof changeSetSchema>
 
 export type ServerChangeable = IssueChange | CommentChange
-
-// export type ServerChangeable = {
-//   id: string
-//   modified_columns: string[]
-//   deleted: boolean
-//   new: boolean
-// }
-
-export type LocalChangeable = {
-  id: string
-  modified: string
-  synced?: boolean
-  sent_to_server?: boolean
-}
 
 export const READWRITE_SYNC_TABLES = ['issue', 'comment']
 export const READ_SYNC_TABLES = ['profiles', ...READWRITE_SYNC_TABLES]

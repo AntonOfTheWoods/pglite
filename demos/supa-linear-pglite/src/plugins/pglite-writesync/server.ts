@@ -1,7 +1,6 @@
-export type ExecuteCallback = (
-  query: string,
-  params?: unknown[]
-) => Promise<void>
+import { deleted, idColumn, isNew, modifiedColumns } from './consts'
+
+type ExecuteCallback = (query: string, params?: unknown[]) => Promise<void>
 export type TransactionCallback = (
   executor: Record<string, ExecuteCallback>
 ) => void
@@ -14,17 +13,16 @@ export type Identifier = string | number
 export interface ServerChangeable<
   IdentifierType extends Identifier = Identifier,
 > extends Record<string, unknown> {
-  id?: IdentifierType | null
-  modified_columns?: string[] | null
-  deleted?: boolean | null
-  new?: boolean | null
+  [idColumn]?: IdentifierType | null
+  [modifiedColumns]?: string[] | null
+  [deleted]?: boolean | null
+  [isNew]?: boolean | null
 }
 
 export async function serverApplyChanges(
   changes: Record<string, ServerChangeable[]>,
   transaction: TransactionExecutor,
   executeName: string
-  // execute: ExecuteCallback
 ) {
   await transaction((executor) => {
     for (const [table, tableChanges] of Object.entries(changes)) {
@@ -41,12 +39,20 @@ async function applyTableChange(
   change: ServerChangeable,
   execute: ExecuteCallback
 ): Promise<void> {
-  const { id, modified_columns, new: isNew, deleted } = change
-
-  if (deleted) {
+  // const { id, modified_columns, new: isNew, deleted } = change
+  const {
+    [idColumn]: id,
+    [modifiedColumns]: modified_columns,
+    isNew,
+    [deleted]: del,
+  } = change
+  // const hasId = change[idColumn]
+  // const hasModifiedColumns = change[modifiedColumns]
+  // const hasIsNew = change[]
+  if (del) {
     await execute(
       `
-        DELETE FROM ${tableName} WHERE id = $1
+        DELETE FROM ${tableName} WHERE ${idColumn} = $1
       `,
       [id]
     )
@@ -55,7 +61,7 @@ async function applyTableChange(
     const values = columns.map((col) => change[col])
     await execute(
       `
-        INSERT INTO ${tableName} (id, ${columns.join(', ')})
+        INSERT INTO ${tableName} (${idColumn}, ${columns.join(', ')})
         VALUES ($1, ${columns.map((_, index) => `$${index + 2}`).join(', ')})
       `,
       [id, ...values]
@@ -68,7 +74,7 @@ async function applyTableChange(
       .join(', ')
     await execute(
       `
-        UPDATE ${tableName} SET ${updateSet} WHERE id = $1
+        UPDATE ${tableName} SET ${updateSet} WHERE ${idColumn} = $1
       `,
       [id, ...values]
     )

@@ -8,3 +8,10 @@ export const sentToServer =
   'sent_to_server_24ae5c82_38e6_430a_a310_a0adb89237f5'
 export const synced = 'synced_d78ceb7d_c1b6_4f11_92b0_0a12657321b1'
 export const backup = 'backup_1230f1a9_4944_467f_b5e0_4ac77966a9d3'
+
+export type LocalChangeable = {
+  [idColumn]: string
+  [modified]: string
+  [synced]?: boolean
+  [sentToServer]?: boolean
+}

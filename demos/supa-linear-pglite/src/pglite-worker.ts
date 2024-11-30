@@ -8,12 +8,9 @@ import m2 from '../db/migrations-client/02-add-local-only-columns.sql?raw'
 import m1 from '../db/migrations/01-create_tables.sql?raw'
 import { localSync } from './plugins/pglite-writesync'
 import { supabase } from './supabase'
-import {
-  type LocalChangeable,
-  READ_SYNC_TABLES,
-  WRITE_SYNC_TABLES,
-} from './utils/changes'
+import { READ_SYNC_TABLES, WRITE_SYNC_TABLES } from './utils/changes'
 import { DB_NAME, ELECTRIC_URL } from './utils/const'
+import { LocalChangeable } from './plugins/pglite-writesync/consts'
 
 const WRITE_SERVER_URL = import.meta.env.VITE_WRITE_SERVER_URL
 const APPLY_CHANGES_URL = `${WRITE_SERVER_URL}/apply-changes`
@@ -59,6 +56,11 @@ let currentToken = getToken()
 let syncSetup = false
 
 async function setupDbSync(pg: PGliteWithLive) {
+  await pg.localSync.startWritePath({
+    syncTables: WRITE_SYNC_TABLES,
+    sender: WRITE_SERVER_URL ? sendToWriteServer : sendToRpc,
+  })
+
   for (const syncTable of READ_SYNC_TABLES) {
     console.log('doing down sync setup', syncTable)
     await pg.sync.syncShapeToTable({
@@ -104,11 +106,6 @@ async function initCheck(db: PGliteWithLive) {
     currentToken = Promise.resolve(ses.data.session.access_token)
     console.log('got a token', syncSetup, await currentToken)
     if (!syncSetup && (await currentToken)) {
-      await db.localSync.startWritePath({
-        syncTables: WRITE_SYNC_TABLES,
-        sender: WRITE_SERVER_URL ? sendToWriteServer : sendToRpc,
-      })
-
       await setupDbSync(db)
       syncSetup = true
     }
@@ -127,27 +124,12 @@ worker({
         live,
       },
     })
-    console.log('before doing m1')
+    // Initialise the static, user-provided sql
     await pg.exec(m1)
-    console.log('after doing m1')
     await pg.exec(m2)
-    console.log('after doing m2')
-
-    // // Hack to ensure CREATE TABLE event trigger gets called on any new tables just created
-    // const tmpName = crypto.randomUUID().replace('-', '_')
-    // await pg.exec(
-    //   `CREATE TABLE ${tmpName} ( "id" INT NOT NULL); DROP TABLE ${tmpName};`
-    // )
 
     if (!syncSetup && (await currentToken)) {
-      console.log('doing the write path', pg.localSync.startWritePath)
-      const myret = await pg.localSync.startWritePath({
-        syncTables: WRITE_SYNC_TABLES,
-        sender: WRITE_SERVER_URL ? sendToWriteServer : sendToRpc,
-      })
-      console.log('doing the write path', myret)
       await setupDbSync(pg)
-      console.log('set up the read path', myret)
       syncSetup = true
     } else {
       initCheck(pg)

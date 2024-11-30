@@ -1,9 +1,14 @@
 import type { Extension, PGliteInterface } from '@electric-sql/pglite'
 import { Mutex } from '@electric-sql/pglite'
 import { PGliteWithLive } from '@electric-sql/pglite/live'
-import { LocalChangeable } from '../../utils/changes'
 import { addSync } from './migrations'
-import { idColumn, modified, sentToServer, synced } from './consts'
+import {
+  idColumn,
+  LocalChangeable,
+  modified,
+  sentToServer,
+  synced,
+} from './consts'
 
 type ChangesetSender = (
   changeset: Record<string, LocalChangeable[]>
