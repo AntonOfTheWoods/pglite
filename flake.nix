@@ -36,9 +36,6 @@
                   languages.javascript = {
                     package = pkgs.nodejs-slim_22;
                     enable = true;
-                    bun = {
-                      enable = true;
-                    };
                     pnpm = {
                       enable = true;
                       # install.enable = true;

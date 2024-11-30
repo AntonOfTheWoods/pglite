@@ -1,8 +1,14 @@
 DROP FUNCTION IF EXISTS applyChanges(content JSONB);
 CREATE OR REPLACE FUNCTION applyChanges(content JSONB) RETURNS JSONB AS $plv8ify$
+// src/plugins/pglite-writesync/consts.ts
+var idColumn = "id";
+var modified = "modified";
+var deleted = "deleted_e77d373e_ba37_4e8b_a659_bdaa603d12d9";
+var isNew = "new_cd727928_b776_4fbc_b078_86f6ff510ab2";
+var modifiedColumns = "modified_columns_577189e4_fc23_48ee_bd44_f7d03168a1c2";
+
 // src/plugins/pglite-writesync/server.ts
 async function serverApplyChanges(changes, transaction2, executeName) {
-  plv8.elog(NOTICE, JSON.stringify(changes), executeName);
   await transaction2((executor) => {
     for (const [table, tableChanges] of Object.entries(changes)) {
       for (const change of tableChanges) {
@@ -13,16 +19,21 @@ async function serverApplyChanges(changes, transaction2, executeName) {
   return { success: true };
 }
 async function applyTableChange(tableName, change, execute) {
-  const { id, modified_columns, new: isNew, deleted } = change;
-  if (deleted) {
+  const {
+    [idColumn]: id,
+    [modifiedColumns]: modified_columns,
+    isNew: isNew3,
+    [deleted]: del
+  } = change;
+  if (del) {
     await execute(`
-        DELETE FROM ${tableName} WHERE id = $1
+        DELETE FROM ${tableName} WHERE ${idColumn} = $1
       `, [id]);
-  } else if (isNew) {
+  } else if (isNew3) {
     const columns = modified_columns || [];
     const values = columns.map((col) => change[col]);
     await execute(`
-        INSERT INTO ${tableName} (id, ${columns.join(", ")})
+        INSERT INTO ${tableName} (${idColumn}, ${columns.join(", ")})
         VALUES ($1, ${columns.map((_, index) => `$${index + 2}`).join(", ")})
       `, [id, ...values]);
   } else {
@@ -30,7 +41,7 @@ async function applyTableChange(tableName, change, execute) {
     const values = columns.map((col) => change[col]);
     const updateSet = columns.map((col, index) => `${col} = $${index + 2}`).join(", ");
     await execute(`
-        UPDATE ${tableName} SET ${updateSet} WHERE id = $1
+        UPDATE ${tableName} SET ${updateSet} WHERE ${idColumn} = $1
       `, [id, ...values]);
   }
 }
@@ -3859,13 +3870,13 @@ var z = /* @__PURE__ */ Object.freeze({
 
 // src/utils/changes.ts
 var syncChangeSchema = z.object({
-  id: z.string(),
-  modified_columns: z.array(z.string()).nullable().optional(),
-  deleted: z.boolean().nullable().optional(),
-  new: z.boolean().nullable().optional()
+  [idColumn]: z.string(),
+  [modifiedColumns]: z.array(z.string()).nullable().optional(),
+  [deleted]: z.boolean().nullable().optional(),
+  [isNew]: z.boolean().nullable().optional(),
+  [modified]: z.string().nullable().optional()
 });
 var commonChangeSchema = syncChangeSchema.merge(z.object({
-  modified: z.string().nullable().optional(),
   created: z.string().nullable().optional(),
   user_id: z.string().nullable().optional()
 }));

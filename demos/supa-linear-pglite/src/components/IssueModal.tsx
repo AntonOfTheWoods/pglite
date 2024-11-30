@@ -22,6 +22,7 @@ import PriorityIcon from './PriorityIcon'
 import StatusIcon from './StatusIcon'
 import PriorityMenu from './contextmenu/PriorityMenu'
 import StatusMenu from './contextmenu/StatusMenu'
+import { idColumn } from '../plugins/pglite-writesync/consts'
 
 interface Props {
   isOpen: boolean
@@ -52,17 +53,16 @@ function IssueModal({ isOpen, onDismiss }: Props) {
 
     const lastIssue = (
       await pg.query<Issue>(`
-        SELECT * FROM issue
+        SELECT kanbanorder FROM issue
         ORDER BY kanbanorder DESC
         LIMIT 1
       `)
     )?.rows[0]
     const kanbanorder = generateKeyBetween(lastIssue?.kanbanorder, null)
 
-    const date = new Date()
     await pg.sql`
-      INSERT INTO issue (id, title, user_id, priority, status, description, modified, created, kanbanorder)
-      VALUES (${crypto.randomUUID()}, ${title}, ${user?.id}, ${priority}, ${status}, ${description ?? ''}, ${date}, ${date}, ${kanbanorder})
+      INSERT INTO issue (${idColumn}, title, user_id, priority, status, description, kanbanorder)
+      VALUES (${crypto.randomUUID()}, ${title}, ${user?.id}, ${priority}, ${status}, ${description ?? ''}, ${kanbanorder})
     `
 
     if (onDismiss) onDismiss()

@@ -26,23 +26,6 @@ async function startWrite(
   syncTables: string[],
   sender: ChangesetSender
 ) {
-  // Use a live query to watch for changes to the local tables that need to be synced
-  // pg.waitReady.then(() => {
-  // pg.live.query<{
-  //   unsynced: number
-  // }>(
-  //   `
-  //   select * from information_schema.tables ist where ist.table_name in ('issue', 'comment', 'far1', 'far2', 'profiles')
-  //   `,
-  //   [],
-  //   async (results) => {
-  //     console.log(
-  //       'tooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo',
-  //       results
-  //     )
-  //   }
-  // )
-
   pg.live.query<{
     unsynced: number
   }>(
@@ -122,18 +105,11 @@ async function doSyncToServer(
   })
 }
 
-async function createPlugin(pg: PGliteWithLive, options?: WriteSyncOptions) {
-  const debug = options?.debug ?? false
-  const metadataSchema = options?.metadataSchema ?? 'pglite_writesync'
-  console.log(
-    'I got a pg and an options waiting for ready',
-    pg,
-    options,
-    debug,
-    metadataSchema
-  )
-
+async function createPlugin(pg: PGliteWithLive) {
   const namespaceObj = {
+    setupSync: async ({ syncTables }: { syncTables: string[] }) => {
+      await addSync(pg, syncTables)
+    },
     startWritePath: async ({
       syncTables,
       sender,
@@ -141,21 +117,16 @@ async function createPlugin(pg: PGliteWithLive, options?: WriteSyncOptions) {
       syncTables: string[]
       sender: ChangesetSender
     }) => {
-      await addSync(pg, syncTables)
       await startWrite(pg, syncTables, sender)
     },
   }
 
   const close = async () => {
-    console.log('Running pglite-writeserver close')
-    // for (const { stream, aborter } of streams) {
-    //   stream.unsubscribeAll()
-    //   aborter.abort()
-    // }
+    // console.debug('Running pglite-writesync close')
   }
 
   const init = async () => {
-    console.log('Running pglite-writeserver init')
+    // console.debug('Running pglite-writesync init')
   }
 
   return {
@@ -165,13 +136,13 @@ async function createPlugin(pg: PGliteWithLive, options?: WriteSyncOptions) {
   }
 }
 
-export function localSync(options?: WriteSyncOptions) {
+export function localSync() {
   return {
     name: 'Postgres local write sync',
     setup: async (pg: PGliteInterface) => {
       // FIXME: how do I type this???
       const fixme = pg as PGliteWithLive
-      const { namespaceObj, close, init } = await createPlugin(fixme, options)
+      const { namespaceObj, close, init } = await createPlugin(fixme)
       return {
         namespaceObj,
         close,

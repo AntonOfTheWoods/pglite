@@ -21,7 +21,7 @@ import {
   filterStateToSql,
   getFilterStateFromSearchParams,
 } from './utils/filterState'
-import { idColumn } from './plugins/pglite-writesync/consts'
+import { idColumn, modified, synced } from './plugins/pglite-writesync/consts'
 
 interface MenuContextInterface {
   showMenu: boolean
@@ -98,7 +98,10 @@ async function issueLoader({
 }) {
   const pg = await pgPromise
   const liveIssue = await pg.live.query<IssueType>({
-    query: `SELECT * FROM issue WHERE ${idColumn} = $1`,
+    query: `
+      SELECT ${idColumn} as id, title, priority, status, ${modified} as modified,
+        created, kanbanorder, user_id, ${synced} as synced
+      FROM issue WHERE ${idColumn} = $1`,
     params: [params.id],
     signal: request.signal,
   })

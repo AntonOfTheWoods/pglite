@@ -10,7 +10,6 @@ import {
 } from './consts'
 
 export async function addSync(pg: PGliteInterface, tables: string[]) {
-  pg.exec(triggerFunctions)
   let sql = tables
     .map(
       (table) => `
@@ -27,8 +26,8 @@ export async function addSync(pg: PGliteInterface, tables: string[]) {
         CREATE INDEX IF NOT EXISTS "${table}_synced_idx" ON "${table}" ("${synced}")`
     )
     .join(';')
-  console.log('executing the add colums', sql)
   await pg.exec(sql)
+  pg.exec(triggerFunctions)
   sql = tables
     .map((table) => {
       return ['delete', 'insert', 'update']
@@ -43,6 +42,5 @@ export async function addSync(pg: PGliteInterface, tables: string[]) {
         .join(';')
     })
     .join(';')
-  console.log('executing the add triggers colums', sql)
   await pg.exec(sql)
 }

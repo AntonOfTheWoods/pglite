@@ -20,6 +20,7 @@ import StatusIcon from '../../components/StatusIcon'
 import { Issue, PriorityDisplay, StatusDisplay } from '../../types/types'
 import Comments from './Comments'
 import DeleteModal from './DeleteModal'
+import { idColumn, modified } from '../../plugins/pglite-writesync/consts'
 
 const debounceTime = 500
 
@@ -54,11 +55,20 @@ function IssuePage() {
   const handleTitleChangeDebounced = useCallback(
     debounce(async (title: string) => {
       console.log(`handleTitleChangeDebounced`, title)
-      pg.sql`
+      pg.query(
+        `
       UPDATE issue
-      SET title = ${title}, modified = ${new Date()}
-      WHERE id = ${issue.id}
-    `
+      SET title = $1, ${modified} = $2
+      WHERE ${idColumn} = $3
+    `,
+        [title, new Date(), issue.id]
+      )
+
+      //   pg.sql`
+      //   UPDATE issue
+      //   SET title = ${title}, ${modified} = ${new Date()}
+      //   WHERE ${idColumn} = ${issue.id}
+      // `
       // We can't set titleIsDirty.current = false here because we haven't yet received
       // the updated issue from the db
     }, debounceTime),
@@ -70,8 +80,8 @@ function IssuePage() {
     debounce(async (description: string) => {
       pg.sql`
         UPDATE issue
-        SET description = ${description}, modified = ${new Date()}
-        WHERE id = ${issue.id}
+        SET description = ${description}, ${modified} = ${new Date()}
+        WHERE ${idColumn} = ${issue.id}
       `
       // We can't set descriptionIsDirty.current = false here because we haven't yet received
       // the updated issue from the db
@@ -99,16 +109,16 @@ function IssuePage() {
   const handleStatusChange = (status: string) => {
     pg.sql`
       UPDATE issue
-      SET status = ${status}, modified = ${new Date()}
-      WHERE id = ${issue.id}
+      SET status = ${status}, ${modified} = ${new Date()}
+      WHERE ${idColumn} = ${issue.id}
     `
   }
 
   const handlePriorityChange = (priority: string) => {
     pg.sql`
       UPDATE issue
-      SET priority = ${priority}, modified = ${new Date()}
-      WHERE id = ${issue.id}
+      SET priority = ${priority}, ${idColumn} = ${new Date()}
+      WHERE ${idColumn} = ${issue.id}
     `
   }
 
@@ -128,7 +138,7 @@ function IssuePage() {
 
   const handleDelete = () => {
     pg.sql`
-      DELETE FROM issue WHERE id = ${issue.id}
+      DELETE FROM issue WHERE ${idColumn} = ${issue.id}
     `
     // Comments will be deleted automatically because of the ON DELETE CASCADE
     handleClose()

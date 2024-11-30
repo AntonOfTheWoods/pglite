@@ -12,6 +12,7 @@ import Editor from '../../components/editor/Editor'
 import { Comment, Issue } from '../../types/types'
 import { formatDate } from '../../utils/date'
 import { showWarning } from '../../utils/notification'
+import { idColumn, synced } from '../../plugins/pglite-writesync/consts'
 
 export interface CommentsProps {
   issue: Issue
@@ -65,9 +66,15 @@ function Comments({ issue }: CommentsProps) {
   const pg = usePGlite()
   const user = useUser()
   const [newCommentBody, setNewCommentBody] = useState<string>(``)
-  const commentsResults = useLiveQuery.sql<Comment>`
-    SELECT * FROM comment WHERE issue_id = ${issue.id}
-  `
+  // const commentsResults = useLiveQuery.sql<Comment>`
+  //   SELECT ${idColumn} as id, body, user_id, issue_id, created, ${synced} as synced
+  //   FROM comment WHERE issue_id = ${issue.id}
+  // `
+  const commentsResults = await pg.live.query<Comment>(
+    `SELECT ${idColumn} as id, body, user_id, issue_id, created, ${synced} as synced
+    FROM comment WHERE issue_id = $1`,
+    [issue.id]
+  )
   const comments = commentsResults?.rows
   const commentList = () => {
     if (comments && comments.length > 0) {
@@ -87,7 +94,7 @@ function Comments({ issue }: CommentsProps) {
     }
 
     pg.sql`
-      INSERT INTO comment (id, issue_id, body, created, user_id)
+      INSERT INTO comment (${idColumn}, issue_id, body, created, user_id)
       VALUES (
         ${crypto.randomUUID()},
         ${issue.id},

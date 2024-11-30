@@ -62,7 +62,6 @@ async function setupDbSync(pg: PGliteWithLive) {
   })
 
   for (const syncTable of READ_SYNC_TABLES) {
-    console.log('doing down sync setup', syncTable)
     await pg.sync.syncShapeToTable({
       shape: {
         url: `${ELECTRIC_URL}`,
@@ -76,7 +75,7 @@ async function setupDbSync(pg: PGliteWithLive) {
             error instanceof FetchError &&
             [401, 403].includes(error.status)
           ) {
-            console.log('something errors', error)
+            console.warn('Got auth error, trying to refresh token', error)
             const token = (await supabase.auth.refreshSession()).data.session
               ?.access_token
             return {
@@ -98,13 +97,12 @@ async function setupDbSync(pg: PGliteWithLive) {
 async function initCheck(db: PGliteWithLive) {
   const ses = await supabase.auth.getSession()
   if (!ses.data.session?.user) {
-    console.log('no session found, waiting and trying again', ses)
+    console.debug('No session found, waiting and trying again', ses)
     setTimeout(async () => {
       await initCheck(db)
     }, 2000)
   } else {
     currentToken = Promise.resolve(ses.data.session.access_token)
-    console.log('got a token', syncSetup, await currentToken)
     if (!syncSetup && (await currentToken)) {
       await setupDbSync(db)
       syncSetup = true
@@ -115,7 +113,6 @@ async function initCheck(db: PGliteWithLive) {
 worker({
   async init() {
     const pg = await PGlite.create({
-      // debug: 1,
       dataDir: `idb://${DB_NAME}`,
       relaxedDurability: true,
       extensions: {
@@ -126,6 +123,9 @@ worker({
     })
     // Initialise the static, user-provided sql
     await pg.exec(m1)
+    await pg.localSync.setupSync({
+      syncTables: WRITE_SYNC_TABLES,
+    })
     await pg.exec(m2)
 
     if (!syncSetup && (await currentToken)) {
@@ -138,97 +138,3 @@ worker({
     return pg
   },
 })
-
-// const syncMutex = new Mutex()
-
-// async function startWritePath(pg: PGliteWithLive) {
-//   // Use a live query to watch for changes to the local tables that need to be synced
-//   pg.live.query<{
-//     unsynced: number
-//   }>(
-//     `
-//       SELECT count(0) as unsynced FROM (
-//       ${WRITE_SYNC_TABLES.map((table) => `SELECT id FROM ${table} WHERE synced = false`).join(' UNION ')}
-//       )
-//     `,
-//     [],
-//     async (results) => {
-//       const { unsynced } = results.rows[0]
-//       if (unsynced > 0) {
-//         await syncMutex.acquire()
-//         try {
-//           doSyncToServer(pg)
-//         } finally {
-//           syncMutex.release()
-//         }
-//       }
-//     }
-//   )
-// }
-//
-// // Call wrapped in mutex to prevent multiple syncs from happening at the same time
-// async function doSyncToServer(pg: PGliteWithLive) {
-//   let changes: LocalChangeable[][] = []
-//   await pg.transaction(async (tx) => {
-//     changes = await Promise.all<LocalChangeable[]>(
-//       WRITE_SYNC_TABLES.map(async (table) => {
-//         return (
-//           await tx.query<LocalChangeable>(`
-//           SELECT * FROM ${table}
-//           WHERE synced = false AND sent_to_server = false
-//         `)
-//         ).rows
-//       })
-//     )
-//   })
-//   const changeSet: Record<string, LocalChangeable[]> = {}
-//   for (const [i, change] of WRITE_SYNC_TABLES.entries()) {
-//     changeSet[change] = changes[i].map(
-//       ({ synced: _, sent_to_server: _1, ...rest }) => {
-//         return rest
-//       }
-//     )
-//   }
-//
-//   if (WRITE_SERVER_URL) {
-//     const response = await fetch(APPLY_CHANGES_URL, {
-//       method: 'POST',
-//       headers: {
-//         'Content-Type': 'application/json',
-//       },
-//       body: JSON.stringify(changeSet),
-//     })
-//     if (!response.ok) {
-//       throw new Error('Failed to apply changes')
-//     }
-//   } else {
-//     const response = await supabase.rpc('applychanges', {
-//       content: changeSet,
-//     })
-//     if (response.error) {
-//       console.error(response.error)
-//       throw new Error('Failed to apply changes')
-//     }
-//   }
-//
-//   await pg.transaction(async (tx) => {
-//     // Mark all changes as sent to server, but check that the modified timestamp
-//     // has not changed in the meantime
-//
-//     tx.exec('SET LOCAL electric.bypass_triggers = true')
-//     await Promise.all(
-//       WRITE_SYNC_TABLES.map(async (table, i) => {
-//         for (const up of changes[i] || []) {
-//           return await tx.query(
-//             `
-//                UPDATE ${table}
-//                SET sent_to_server = true
-//                WHERE id = $1 AND modified = $2
-//              `,
-//             [up.id, up.modified]
-//           )
-//         }
-//       })
-//     )
-//   })
-// }

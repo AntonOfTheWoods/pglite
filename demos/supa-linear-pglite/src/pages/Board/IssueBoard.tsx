@@ -5,6 +5,7 @@ import { Issue, Status, StatusDisplay, StatusValue } from '../../types/types'
 import { useLiveQuery, usePGlite } from '@electric-sql/pglite-react'
 import IssueCol from './IssueCol'
 import { LiveQuery, LiveQueryResults } from '@electric-sql/pglite/live'
+import { modified } from '../../plugins/pglite-writesync/consts'
 
 export interface IssueBoardProps {
   columnsLiveIssues: Record<StatusValue, LiveQuery<Issue>>
@@ -192,18 +193,18 @@ export default function IssueBoard({ columnsLiveIssues }: IssueBoardProps) {
       const kanbanorder = getNewKanbanOrder(prevIssue, nextIssue)
       // Keep track of moved issues so we can override the status and kanbanorder when
       // sorting issues into columns.
-      const modified = new Date()
+      const newModified = new Date()
       setMovedIssues((prev) => ({
         ...prev,
         [draggableId]: {
           status: destination.droppableId as StatusValue,
           kanbanorder,
-          modified,
+          modified: newModified,
         },
       }))
       pg.sql`
         UPDATE issue
-        SET status = ${destination.droppableId}, kanbanorder = ${kanbanorder}, modified = ${modified}
+        SET status = ${destination.droppableId}, kanbanorder = ${kanbanorder}, ${modified} = ${newModified}
         WHERE id = ${draggableId}
       `
     }

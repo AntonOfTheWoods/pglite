@@ -9,6 +9,7 @@ import Avatar from '../../components/Avatar'
 import PriorityMenu from '../../components/contextmenu/PriorityMenu'
 import PriorityIcon from '../../components/PriorityIcon'
 import { Issue } from '../../types/types'
+import { idColumn, modified } from '../../plugins/pglite-writesync/consts'
 
 interface IssueProps {
   issue: Issue
@@ -43,8 +44,8 @@ const IssueItem = ({ issue, style, isDragging, provided }: IssueProps) => {
   const updatePriority = (priority: string) => {
     pg.sql`
       UPDATE issue
-      SET priority = ${priority}, modified = ${new Date()}
-      WHERE id = ${issue.id}
+      SET priority = ${priority}, ${modified} = ${new Date()}
+      WHERE ${idColumn} = ${issue.id}
     `
   }
 
