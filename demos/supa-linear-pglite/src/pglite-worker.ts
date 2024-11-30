@@ -139,6 +139,7 @@ worker({
 
     if (!syncSetup && (await currentToken)) {
       await setupDbSync(pg)
+      await pg.localSync.startWritePath()
       syncSetup = true
     } else {
       initCheck(pg)
