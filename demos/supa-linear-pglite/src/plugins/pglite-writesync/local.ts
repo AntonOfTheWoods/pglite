@@ -2,7 +2,7 @@ import type { Extension, PGliteInterface } from '@electric-sql/pglite'
 import { Mutex } from '@electric-sql/pglite'
 import { PGliteWithLive } from '@electric-sql/pglite/live'
 import { LocalChangeable } from '../../utils/changes'
-import { addSync } from './migrations'
+import { addSync, synced } from './migrations'
 
 type ChangesetSender = (
   changeset: Record<string, LocalChangeable[]>
@@ -21,44 +21,44 @@ async function startWrite(
   sender: ChangesetSender
 ) {
   // Use a live query to watch for changes to the local tables that need to be synced
-  pg.waitReady.then(() => {
-    pg.live.query<{
-      unsynced: number
-    }>(
-      `
-      select * from information_schema.tables ist where ist.table_name in ('issue', 'comment', 'far1', 'far2', 'profiles')
-      `,
-      [],
-      async (results) => {
-        console.log(
-          'tooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo',
-          results
-        )
-      }
-    )
+  // pg.waitReady.then(() => {
+  // pg.live.query<{
+  //   unsynced: number
+  // }>(
+  //   `
+  //   select * from information_schema.tables ist where ist.table_name in ('issue', 'comment', 'far1', 'far2', 'profiles')
+  //   `,
+  //   [],
+  //   async (results) => {
+  //     console.log(
+  //       'tooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo',
+  //       results
+  //     )
+  //   }
+  // )
 
-    pg.live.query<{
-      unsynced: number
-    }>(
-      `
+  pg.live.query<{
+    unsynced: number
+  }>(
+    `
        SELECT count(0) as unsynced FROM (
-       ${syncTables.map((table) => `SELECT id FROM ${table} WHERE synced = false`).join(' UNION ')}
+       ${syncTables.map((table) => `SELECT id FROM ${table} WHERE ${synced} = false`).join(' UNION ')}
        )
      `,
-      [],
-      async (results) => {
-        const { unsynced } = results.rows[0]
-        if (unsynced > 0) {
-          await syncMutex.acquire()
-          try {
-            doSyncToServer(pg, syncTables, sender)
-          } finally {
-            syncMutex.release()
-          }
+    [],
+    async (results) => {
+      const { unsynced } = results.rows[0]
+      if (unsynced > 0) {
+        await syncMutex.acquire()
+        try {
+          doSyncToServer(pg, syncTables, sender)
+        } finally {
+          syncMutex.release()
         }
       }
-    )
-  })
+    }
+  )
+  // })
 }
 
 // Call wrapped in mutex to prevent multiple syncs from happening at the same time
@@ -113,9 +113,9 @@ async function doSyncToServer(
   })
 }
 
-async function createPlugin(pg: PGliteWithLive, options: WriteSyncOptions) {
-  const debug = options.debug ?? false
-  const metadataSchema = options.metadataSchema ?? 'pglite_writesync'
+async function createPlugin(pg: PGliteWithLive, options?: WriteSyncOptions) {
+  const debug = options?.debug ?? false
+  const metadataSchema = options?.metadataSchema ?? 'pglite_writesync'
   console.log(
     'I got a pg and an options waiting for ready',
     pg,
@@ -129,17 +129,15 @@ async function createPlugin(pg: PGliteWithLive, options: WriteSyncOptions) {
   // await addSync(pg, options.syncTables, 'public')
 
   const namespaceObj = {
-    maybeMigrateHere: async () => {
-      return 'hithere!'
-    },
-    startWritePath: ({
+    startWritePath: async ({
       syncTables,
       sender,
     }: {
       syncTables: string[]
       sender: ChangesetSender
     }) => {
-      startWrite(pg, syncTables, sender)
+      await addSync(pg, syncTables)
+      await startWrite(pg, syncTables, sender)
     },
   }
 
@@ -162,7 +160,7 @@ async function createPlugin(pg: PGliteWithLive, options: WriteSyncOptions) {
   }
 }
 
-export function localSync(options: WriteSyncOptions) {
+export function localSync(options?: WriteSyncOptions) {
   return {
     name: 'Postgres local write sync',
     setup: async (pg: PGliteInterface) => {

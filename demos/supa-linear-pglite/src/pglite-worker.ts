@@ -117,10 +117,7 @@ worker({
       dataDir: `idb://${DB_NAME}`,
       relaxedDurability: true,
       extensions: {
-        localSync: localSync({
-          syncTables: WRITE_SYNC_TABLES,
-          sender: WRITE_SERVER_URL ? sendToWriteServer : sendToRpc,
-        }),
+        localSync: localSync(),
         sync: electricSync(),
         live,
       },
@@ -139,7 +136,10 @@ worker({
 
     if (!syncSetup && (await currentToken)) {
       await setupDbSync(pg)
-      await pg.localSync.startWritePath()
+      await pg.localSync.startWritePath({
+        syncTables: WRITE_SYNC_TABLES,
+        sender: WRITE_SERVER_URL ? sendToWriteServer : sendToRpc,
+      })
       syncSetup = true
     } else {
       initCheck(pg)
