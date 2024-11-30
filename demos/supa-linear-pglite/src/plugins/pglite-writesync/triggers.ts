@@ -1,4 +1,4 @@
-export const triggers = `
+export const triggerFunctions = `
 
 -- During sync the electric.syncing config var is set to true
 -- We can use this in triggers to determine the action that should be performed

@@ -11,11 +11,9 @@ import { supabase } from './supabase'
 import {
   type LocalChangeable,
   READ_SYNC_TABLES,
-  READWRITE_SYNC_TABLES,
   WRITE_SYNC_TABLES,
 } from './utils/changes'
 import { DB_NAME, ELECTRIC_URL } from './utils/const'
-import { migrate } from './plugins/pglite-writesync/migrations'
 
 const WRITE_SERVER_URL = import.meta.env.VITE_WRITE_SERVER_URL
 const APPLY_CHANGES_URL = `${WRITE_SERVER_URL}/apply-changes`
@@ -133,7 +131,12 @@ worker({
     await pg.exec(m2)
     console.log('after doing m2')
 
-    await migrate(pg, READWRITE_SYNC_TABLES)
+    // // Hack to ensure CREATE TABLE event trigger gets called on any new tables just created
+    // const tmpName = crypto.randomUUID().replace('-', '_')
+    // await pg.exec(
+    //   `CREATE TABLE ${tmpName} ( "id" INT NOT NULL); DROP TABLE ${tmpName};`
+    // )
+
     if (!syncSetup && (await currentToken)) {
       await setupDbSync(pg)
       syncSetup = true

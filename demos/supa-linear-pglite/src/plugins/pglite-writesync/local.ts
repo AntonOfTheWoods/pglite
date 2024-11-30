@@ -2,6 +2,7 @@ import type { Extension, PGliteInterface } from '@electric-sql/pglite'
 import { Mutex } from '@electric-sql/pglite'
 import { PGliteWithLive } from '@electric-sql/pglite/live'
 import { LocalChangeable } from '../../utils/changes'
+import { addSync } from './migrations'
 
 type ChangesetSender = (
   changeset: Record<string, LocalChangeable[]>
@@ -27,35 +28,38 @@ async function startWritePath(
       unsynced: number
     }>(
       `
-      select * from information_schema.tables ist where ist.table_name in ('issue', 'comment', 'far1', 'far2', 'far3')
+      select * from information_schema.tables ist where ist.table_name in ('issue', 'comment', 'far1', 'far2', 'profiles')
       `,
       [],
       async (results) => {
-        console.log(results)
+        console.log(
+          'tooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo',
+          results
+        )
       }
     )
 
-    // pg.live.query<{
-    //   unsynced: number
-    // }>(
-    //   `
-    //   SELECT count(0) as unsynced FROM (
-    //   ${syncTables.map((table) => `SELECT id FROM ${table} WHERE synced = false`).join(' UNION ')}
-    //   )
-    // `,
-    //   [],
-    //   async (results) => {
-    //     const { unsynced } = results.rows[0]
-    //     if (unsynced > 0) {
-    //       await syncMutex.acquire()
-    //       try {
-    //         doSyncToServer(pg, syncTables, sender)
-    //       } finally {
-    //         syncMutex.release()
-    //       }
-    //     }
-    //   }
-    // )
+    pg.live.query<{
+      unsynced: number
+    }>(
+      `
+       SELECT count(0) as unsynced FROM (
+       ${syncTables.map((table) => `SELECT id FROM ${table} WHERE synced = false`).join(' UNION ')}
+       )
+     `,
+      [],
+      async (results) => {
+        const { unsynced } = results.rows[0]
+        if (unsynced > 0) {
+          await syncMutex.acquire()
+          try {
+            doSyncToServer(pg, syncTables, sender)
+          } finally {
+            syncMutex.release()
+          }
+        }
+      }
+    )
   })
 }
 
@@ -124,12 +128,14 @@ async function createPlugin(pg: PGliteWithLive, options: WriteSyncOptions) {
   // await pg.waitReady
   // console.log('its ready')
   // await migrate(pg, READWRITE_SYNC_TABLES)
+  await addSync(pg, options.syncTables, 'public')
 
-  startWritePath(pg, options.syncTables, options.sender)
   const namespaceObj = {
     maybeMigrateHere: async () => {
       return 'hithere!'
     },
+    startWritePath: () =>
+      startWritePath(pg, options.syncTables, options.sender),
   }
 
   const close = async () => {
