@@ -105,7 +105,7 @@ export function filterStateToSql(filterState: FilterState) {
   }
 
   const sql = `
-   SELECT ${idColumn}, title, priority, status, ${modified}, created, kanbanorder, user_id, ${synced}
+   SELECT ${idColumn} as id, title, priority, status, ${modified} as modified, created, kanbanorder, user_id, ${synced} as synced
     FROM issue
     WHERE
       ${sqlWhere.length ? `${sqlWhere.join(' AND ')} AND ` : ''}
@@ -114,14 +114,5 @@ export function filterStateToSql(filterState: FilterState) {
       ${filterState.orderBy} ${filterState.orderDirection},
       ${idColumn} ASC
   `
-  // const sql = `
-  //   SELECT *
-  //   FROM issue
-  //   WHERE 1 = 1
-  //     ${sqlWhere.length ? ` AND ${sqlWhere.join(' AND ')} ` : ''}
-  //   ORDER BY
-  //     ${filterState.orderBy} ${filterState.orderDirection},
-  //     ${idColumn} ASC
-  // `
   return { sql, sqlParams }
 }
