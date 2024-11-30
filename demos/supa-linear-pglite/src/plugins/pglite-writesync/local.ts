@@ -11,13 +11,11 @@ type ChangesetSender = (
 export interface WriteSyncOptions {
   debug?: boolean
   metadataSchema?: string
-  syncTables: string[]
-  sender: ChangesetSender
 }
 
 const syncMutex = new Mutex()
 
-async function startWritePath(
+async function startWrite(
   pg: PGliteWithLive,
   syncTables: string[],
   sender: ChangesetSender
@@ -128,14 +126,21 @@ async function createPlugin(pg: PGliteWithLive, options: WriteSyncOptions) {
   // await pg.waitReady
   // console.log('its ready')
   // await migrate(pg, READWRITE_SYNC_TABLES)
-  await addSync(pg, options.syncTables, 'public')
+  // await addSync(pg, options.syncTables, 'public')
 
   const namespaceObj = {
     maybeMigrateHere: async () => {
       return 'hithere!'
     },
-    startWritePath: () =>
-      startWritePath(pg, options.syncTables, options.sender),
+    startWritePath: ({
+      syncTables,
+      sender,
+    }: {
+      syncTables: string[]
+      sender: ChangesetSender
+    }) => {
+      startWrite(pg, syncTables, sender)
+    },
   }
 
   const close = async () => {
