@@ -6,9 +6,10 @@
   "type": "module",
   "scripts": {
     "backend:up": "dotenv -- cp --update=none ./server/.env.example ./server/.env && docker compose -f ./server/docker-compose.yml up -d ",
-    "backend:down": "dotenv -- docker compose -f ./server/docker-compose.yml down --volumes --remove-orphans && sudo rm -rf server/volumes/db/data/ && sudo rm -rf server/volumes/storage",
+    "backend:down": "dotenv -- docker compose -f ./server/docker-compose.yml down",
+    "backend:clean": "dotenv -- docker compose -f ./server/docker-compose.yml down --volumes --remove-orphans && sudo rm -rf server/volumes/db/data/ && sudo rm -rf server/volumes/storage",
     "db:load-data": "cp --update=none .env.example .env && dotenv -- node ./db/load_data.js",
-    "reset": "pnpm backend:down && pnpm backend:up && pnpm db:load-data",
+    "reset": "pnpm backend:clean && pnpm backend:up && pnpm db:load-data",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",

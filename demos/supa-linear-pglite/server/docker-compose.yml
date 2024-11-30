@@ -390,7 +390,8 @@ services:
       - -c
       - config_file=/etc/postgresql/postgresql.conf
       - -c
-      - log_min_messages=fatal # prevents Realtime polling queries from appearing in logs
+      # - log_min_messages=fatal # prevents Realtime polling queries from appearing in logs
+      - log_min_messages=LOG
     restart: unless-stopped
     environment:
       POSTGRES_HOST: /var/run/postgresql

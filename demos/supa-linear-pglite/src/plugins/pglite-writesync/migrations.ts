@@ -1,9 +1,7 @@
-import type { PGlite } from '@electric-sql/pglite'
-import m2 from '../db/migrations-client/02-sync-triggers.sql?raw'
-import m3 from '../db/migrations-client/03-add-local-only-columns.sql?raw'
-import m1 from '../db/migrations/01-create_tables.sql?raw'
+import { PGliteWithLive } from '@electric-sql/pglite/live'
+import { triggers } from './triggers'
 
-async function addSync(pg: PGlite, tables: string[]) {
+async function addSync(pg: PGliteWithLive, tables: string[]) {
   let sql = tables
     .map(
       (table) => `
@@ -19,8 +17,12 @@ async function addSync(pg: PGlite, tables: string[]) {
         CREATE INDEX IF NOT EXISTS "${table}_synced_idx" ON "${table}" ("synced")`
     )
     .join(';')
+  console.log('doing alters', sql)
   await pg.exec(sql)
-  await pg.exec(m2)
+  console.log('doing trigger functions')
+
+  await pg.exec(triggers)
+
   sql = tables
     .map((table) => {
       return ['delete', 'insert', 'update']
@@ -35,11 +37,10 @@ async function addSync(pg: PGlite, tables: string[]) {
         .join(';')
     })
     .join(';')
+  console.log('doing triggers', sql)
   await pg.exec(sql)
-  await pg.exec(m3)
 }
 
-export async function migrate(pg: PGlite, bidirectionalTables: string[]) {
-  await pg.exec(m1)
-  await addSync(pg, bidirectionalTables)
+export async function migrate(pg: PGliteWithLive, writeSynctables: string[]) {
+  await addSync(pg, writeSynctables)
 }

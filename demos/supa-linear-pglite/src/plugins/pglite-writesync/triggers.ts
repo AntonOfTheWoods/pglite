@@ -1,3 +1,4 @@
+export const triggers = `
 
 -- During sync the electric.syncing config var is set to true
 -- We can use this in triggers to determine the action that should be performed
@@ -212,3 +213,5 @@ $$ LANGUAGE plpgsql;
 -- Example usage:
 -- SELECT revert_local_changes('issue', '123e4567-e89b-12d3-a456-426614174000');
 -- SELECT revert_local_changes('comment', '123e4567-e89b-12d3-a456-426614174001');
+
+`
