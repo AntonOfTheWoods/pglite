@@ -104,6 +104,11 @@ async function initCheck(db: PGliteWithLive) {
     currentToken = Promise.resolve(ses.data.session.access_token)
     console.log('got a token', syncSetup, await currentToken)
     if (!syncSetup && (await currentToken)) {
+      await db.localSync.startWritePath({
+        syncTables: WRITE_SYNC_TABLES,
+        sender: WRITE_SERVER_URL ? sendToWriteServer : sendToRpc,
+      })
+
       await setupDbSync(db)
       syncSetup = true
     }
@@ -135,11 +140,14 @@ worker({
     // )
 
     if (!syncSetup && (await currentToken)) {
-      await setupDbSync(pg)
-      await pg.localSync.startWritePath({
+      console.log('doing the write path', pg.localSync.startWritePath)
+      const myret = await pg.localSync.startWritePath({
         syncTables: WRITE_SYNC_TABLES,
         sender: WRITE_SERVER_URL ? sendToWriteServer : sendToRpc,
       })
+      console.log('doing the write path', myret)
+      await setupDbSync(pg)
+      console.log('set up the read path', myret)
       syncSetup = true
     } else {
       initCheck(pg)

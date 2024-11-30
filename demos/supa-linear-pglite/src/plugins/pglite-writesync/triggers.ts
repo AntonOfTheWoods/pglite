@@ -1,11 +1,13 @@
 import {
   backup,
   deleted,
+  idColumn,
   isNew,
+  modified,
   modifiedColumns,
   sentToServer,
   synced,
-} from './migrations'
+} from './consts'
 
 export const triggerFunctions = `
 
@@ -15,6 +17,7 @@ export const triggerFunctions = `
 -- # Delete triggers:
 -- - During sync we delete rows
 -- - Otherwise we set the deleted flag to true
+
 CREATE OR REPLACE FUNCTION handle_delete()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -35,12 +38,12 @@ BEGIN
         RETURN OLD;
     ELSE
         -- For local deletions, check if the row is new
-        IF OLD.new THEN
+        IF OLD.${isNew} THEN
             -- If the row is new, just delete it
             RETURN OLD;
         ELSE
             -- Otherwise, set the deleted flag instead of actually deleting
-            EXECUTE format('UPDATE %I SET deleted = true WHERE id = $1', TG_TABLE_NAME) USING OLD.id;
+            EXECUTE format('UPDATE %I SET ${deleted} = true WHERE ${idColumn} = $1', TG_TABLE_NAME) USING OLD.${idColumn};
             RETURN NULL;
         END IF;
     END IF;
@@ -77,29 +80,29 @@ BEGIN
         NEW.${isNew} := FALSE;
         NEW.${sentToServer} := FALSE;
         -- If the row already exists in the database, handle it as an update
-        EXECUTE format('SELECT 1 FROM %I WHERE id = $1', TG_TABLE_NAME) USING NEW.id INTO old_value;
+        EXECUTE format('SELECT 1 FROM %I WHERE id = $1', TG_TABLE_NAME) USING NEW.${idColumn} INTO old_value;
         IF old_value IS NOT NULL THEN
             -- Apply update logic similar to handle_update function
             FOR col_name IN SELECT column_name
                                FROM information_schema.columns
                                WHERE table_name = TG_TABLE_NAME AND
-                                     column_name NOT IN ('id', '${synced}', '${modifiedColumns}', '${backup}',
+                                     column_name NOT IN ('${idColumn}', '${synced}', '${modifiedColumns}', '${backup}',
                                      '${deleted}', '${isNew}', '${sentToServer}') LOOP
                 EXECUTE format('SELECT $1.%I', col_name) USING NEW INTO new_value;
-                EXECUTE format('SELECT %I FROM %I WHERE id = $1', col_name, TG_TABLE_NAME) USING NEW.id INTO old_value;
+                EXECUTE format('SELECT %I FROM %I WHERE ${idColumn} = $1', col_name, TG_TABLE_NAME) USING NEW.${idColumn} INTO old_value;
                 IF new_value IS DISTINCT FROM old_value THEN
-                    EXECUTE format('UPDATE %I SET %I = $1 WHERE id = $2', TG_TABLE_NAME, col_name) USING new_value, NEW.id;
+                    EXECUTE format('UPDATE %I SET %I = $1 WHERE ${idColumn} = $2', TG_TABLE_NAME, col_name) USING new_value, NEW.${idColumn};
                 END IF;
             END LOOP;
             -- Update modified_columns
             EXECUTE format('UPDATE %I SET ${modifiedColumns} = $1 WHERE id = $2', TG_TABLE_NAME)
-            USING ARRAY[]::TEXT[], NEW.id;
+            USING ARRAY[]::TEXT[], NEW.${idColumn};
             -- Update new flag
-            EXECUTE format('UPDATE %I SET new = $1 WHERE id = $2', TG_TABLE_NAME)
-            USING FALSE, NEW.id;
+            EXECUTE format('UPDATE %I SET ${isNew} = $1 WHERE ${idColumn} = $2', TG_TABLE_NAME)
+            USING FALSE, NEW.${idColumn};
             -- Update sent_to_server flag
             EXECUTE format('UPDATE %I SET ${sentToServer} = $1 WHERE id = $2', TG_TABLE_NAME)
-            USING FALSE, NEW.id;
+            USING FALSE, NEW.${idColumn};
             RETURN NULL; -- Prevent insertion of a new row
         END IF;
     ELSE
@@ -107,7 +110,7 @@ BEGIN
         SELECT array_agg(column_name) INTO modified_columns
         FROM information_schema.columns
         WHERE table_name = TG_TABLE_NAME
-        AND column_name NOT IN ('id', '${synced}', '${modifiedColumns}', '${backup}', '${deleted}', '${isNew}', '${sentToServer}');
+        AND column_name NOT IN ('${idColumn}', '${synced}', '${modifiedColumns}', '${backup}', '${deleted}', '${isNew}', '${sentToServer}');
         NEW.${modifiedColumns} := ${modifiedColumns};
         NEW.${isNew} := TRUE;
     END IF;
@@ -148,7 +151,7 @@ BEGIN
 
     IF is_syncing THEN
         -- During sync
-        IF (OLD.synced = TRUE) OR (OLD.sent_to_server = TRUE AND NEW.modified >= OLD.modified) THEN
+        IF (OLD.${synced} = TRUE) OR (OLD.${sentToServer} = TRUE AND NEW.${modified} >= OLD.${modified}) THEN
             -- Apply the update, reset modified_columns, backup, new, and sent_to_server flags
             NEW.${modifiedColumns} := ARRAY[]::TEXT[];
             NEW.${backup} := NULL;
@@ -159,25 +162,25 @@ BEGIN
             FOR column_name IN SELECT columns.column_name
                                FROM information_schema.columns
                                WHERE columns.table_name = TG_TABLE_NAME
-                               AND columns.column_name NOT IN ('id', '${synced}', '${modifiedColumns}', '${backup}',
+                               AND columns.column_name NOT IN ('${idColumn}', '${synced}', '${modifiedColumns}', '${backup}',
                                 '${deleted}', '${isNew}', '${sentToServer}') LOOP
                 IF column_name != ANY(OLD.${modifiedColumns}) THEN
                     EXECUTE format('SELECT ($1).%I', column_name) USING NEW INTO new_value;
                     EXECUTE format('SELECT ($1).%I', column_name) USING OLD INTO old_value;
                     IF new_value IS DISTINCT FROM old_value THEN
-                        EXECUTE format('UPDATE %I SET %I = $1 WHERE id = $2', TG_TABLE_NAME, column_name) USING new_value, NEW.id;
+                        EXECUTE format('UPDATE %I SET %I = $1 WHERE id = $2', TG_TABLE_NAME, column_name) USING new_value, NEW.${idColumn};
                         NEW.${backup} := jsonb_set(COALESCE(NEW.${backup}, '{}'::jsonb), ARRAY[column_name], to_jsonb(old_value));
                     END IF;
                 END IF;
             END LOOP;
-            NEW.new := FALSE;
+            NEW.${isNew} := FALSE;
         END IF;
     ELSE
         -- During non-sync transaction
         FOR column_name IN SELECT columns.column_name
                            FROM information_schema.columns
                            WHERE columns.table_name = TG_TABLE_NAME
-                           AND columns.column_name NOT IN ('id', '${synced}', '${modifiedColumns}', '${backup}',
+                           AND columns.column_name NOT IN ('${idColumn}', '${synced}', '${modifiedColumns}', '${backup}',
                             '${deleted}', '${isNew}', '${sentToServer}') LOOP
             EXECUTE format('SELECT ($1).%I', column_name) USING NEW INTO new_value;
             EXECUTE format('SELECT ($1).%I', column_name) USING OLD INTO old_value;
@@ -188,7 +191,7 @@ BEGIN
                 END IF;
             END IF;
         END LOOP;
-        NEW.sent_to_server := FALSE;
+        NEW.${sentToServer} := FALSE;
     END IF;
 
     RETURN NEW;
@@ -204,7 +207,7 @@ DECLARE
     column_name TEXT;
     column_value JSONB;
 BEGIN
-    EXECUTE format('SELECT ${backup} FROM %I WHERE id = $1', table_name)
+    EXECUTE format('SELECT ${backup} FROM %I WHERE ${idColumn} = $1', table_name)
     INTO backup_data
     USING row_id;
 
@@ -212,12 +215,12 @@ BEGIN
         FOR column_name, column_value IN SELECT * FROM jsonb_each(backup_data)
         LOOP
             EXECUTE format('UPDATE %I SET %I = $1, ${modifiedColumns} = array_remove(${modifiedColumns}, $2)
-                WHERE id = $3', table_name, column_name)
+                WHERE ${idColumn} = $3', table_name, column_name)
             USING column_value, column_name, row_id;
         END LOOP;
 
         -- Clear the backup after reverting
-        EXECUTE format('UPDATE %I SET ${backup} = NULL WHERE id = $1', table_name)
+        EXECUTE format('UPDATE %I SET ${backup} = NULL WHERE ${idColumn} = $1', table_name)
         USING row_id;
     END IF;
 END;

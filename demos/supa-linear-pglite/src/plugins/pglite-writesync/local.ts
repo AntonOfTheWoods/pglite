@@ -2,7 +2,8 @@ import type { Extension, PGliteInterface } from '@electric-sql/pglite'
 import { Mutex } from '@electric-sql/pglite'
 import { PGliteWithLive } from '@electric-sql/pglite/live'
 import { LocalChangeable } from '../../utils/changes'
-import { addSync, synced } from './migrations'
+import { addSync } from './migrations'
+import { idColumn, modified, sentToServer, synced } from './consts'
 
 type ChangesetSender = (
   changeset: Record<string, LocalChangeable[]>
@@ -74,7 +75,7 @@ async function doSyncToServer(
         return (
           await tx.query<LocalChangeable>(`
           SELECT * FROM ${table}
-          WHERE synced = false AND sent_to_server = false
+          WHERE ${synced} = false AND ${sentToServer} = false
         `)
         ).rows
       })
@@ -83,8 +84,11 @@ async function doSyncToServer(
   const changeSet: Record<string, LocalChangeable[]> = {}
   for (const [i, change] of syncTables.entries()) {
     changeSet[change] = changes[i].map(
-      ({ synced: _, sent_to_server: _1, ...rest }) => {
-        return rest
+      // ({ synced: _, sent_to_server: _1, ...rest }) => {
+      (change) => {
+        if (synced in change) delete change[synced]
+        if (sentToServer in change) delete change[sentToServer]
+        return change
       }
     )
   }
@@ -102,8 +106,8 @@ async function doSyncToServer(
           return await tx.query(
             `
                UPDATE ${table}
-               SET sent_to_server = true
-               WHERE id = $1 AND modified = $2
+               SET ${sentToServer} = true
+               WHERE ${idColumn} = $1 AND ${modified} = $2
              `,
             [up.id, up.modified]
           )
@@ -123,10 +127,6 @@ async function createPlugin(pg: PGliteWithLive, options?: WriteSyncOptions) {
     debug,
     metadataSchema
   )
-  // await pg.waitReady
-  // console.log('its ready')
-  // await migrate(pg, READWRITE_SYNC_TABLES)
-  // await addSync(pg, options.syncTables, 'public')
 
   const namespaceObj = {
     startWritePath: async ({

@@ -8,6 +8,7 @@ import FilterMenu from './contextmenu/FilterMenu'
 import { FilterState, useFilterState } from '../utils/filterState'
 import { PriorityDisplay, StatusDisplay } from '../types/types'
 import debounce from 'lodash.debounce'
+import { deleted, idColumn } from '../plugins/pglite-writesync/consts'
 
 interface Props {
   filteredIssuesCount: number
@@ -32,7 +33,7 @@ export default function ({
   filterState ??= usedFilterState
 
   const totalIssuesCount = useLiveQuery<{ count: number }>(
-    `SELECT COUNT(id) FROM issue WHERE deleted = false`
+    `SELECT COUNT(${idColumn}) FROM issue WHERE ${deleted} = false`
   )?.rows[0].count
 
   const handleSearchInner = debounce((query: string) => {

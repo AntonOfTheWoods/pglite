@@ -1,4 +1,10 @@
 import { useSearchParams } from 'react-router-dom'
+import {
+  deleted,
+  idColumn,
+  modified,
+  synced,
+} from '../plugins/pglite-writesync/consts'
 
 export interface FilterState {
   orderBy: string
@@ -97,15 +103,25 @@ export function filterStateToSql(filterState: FilterState) {
     sqlWhere.push(`search_vector @@ plainto_tsquery('simple', $${i++})`)
     sqlParams.push(filterState.query)
   }
+
   const sql = `
-    SELECT id, title, priority, status, modified, created, kanbanorder, user_id, synced
+   SELECT ${idColumn}, title, priority, status, ${modified}, created, kanbanorder, user_id, ${synced}
     FROM issue
     WHERE
       ${sqlWhere.length ? `${sqlWhere.join(' AND ')} AND ` : ''}
-      deleted = false
+      ${deleted} = false
     ORDER BY
       ${filterState.orderBy} ${filterState.orderDirection},
-      id ASC
+      ${idColumn} ASC
   `
+  // const sql = `
+  //   SELECT *
+  //   FROM issue
+  //   WHERE 1 = 1
+  //     ${sqlWhere.length ? ` AND ${sqlWhere.join(' AND ')} ` : ''}
+  //   ORDER BY
+  //     ${filterState.orderBy} ${filterState.orderDirection},
+  //     ${idColumn} ASC
+  // `
   return { sql, sqlParams }
 }

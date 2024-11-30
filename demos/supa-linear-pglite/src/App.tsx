@@ -21,6 +21,7 @@ import {
   filterStateToSql,
   getFilterStateFromSearchParams,
 } from './utils/filterState'
+import { idColumn } from './plugins/pglite-writesync/consts'
 
 interface MenuContextInterface {
   showMenu: boolean
@@ -97,7 +98,7 @@ async function issueLoader({
 }) {
   const pg = await pgPromise
   const liveIssue = await pg.live.query<IssueType>({
-    query: `SELECT * FROM issue WHERE id = $1`,
+    query: `SELECT * FROM issue WHERE ${idColumn} = $1`,
     params: [params.id],
     signal: request.signal,
   })
